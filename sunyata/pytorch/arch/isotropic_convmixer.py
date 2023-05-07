@@ -15,7 +15,8 @@ class IsotropicCfg(BaseCfg):
     patch_size: int = 2
     num_classes: int = 10
 
-    drop_rate: float = 0.    
+    drop_rate: float = 0.
+    layer_norm_zero_init: bool = True    
 
 # %%
 class Isotropic(BaseModule):
@@ -80,7 +81,9 @@ class BayesIsotropic(Isotropic):
 
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         # self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
-        
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
@@ -104,6 +107,8 @@ class BayesIsotropic2(Isotropic2):
         super().__init__(cfg)
 
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),

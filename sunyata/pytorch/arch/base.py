@@ -79,6 +79,22 @@ class LayerNorm2d(nn.LayerNorm):
         x = x.permute(0, 3, 1, 2)
         return x
 
+class SE(nn.Module):
+    def __init__(self, hidden_dim: int, squeeze_factor: int = 4):
+        super().__init__()
+        squeeze_c = hidden_dim // squeeze_factor
+        self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
+        self.excitation = nn.Sequential(
+			nn.Conv2d(hidden_dim, squeeze_c, 1),
+			nn.ReLU(inplace=True),
+			nn.Conv2d(squeeze_c , hidden_dim, 1),
+			nn.Sigmoid())
+        
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        scale = self.squeeze(x)
+        scale = self.excitation(scale)
+        return x * scale   
 
 class ConvMixerLayer(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
@@ -91,6 +107,7 @@ class ConvMixerLayer(nn.Sequential):
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim, eps=7e-5),
             # nn.Dropout(drop_rate)
+            SE(hidden_dim),
             StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
 
@@ -102,6 +119,7 @@ class ConvMixerLayer2(nn.Sequential):
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim),
             )),
+            SE(hidden_dim),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim), 

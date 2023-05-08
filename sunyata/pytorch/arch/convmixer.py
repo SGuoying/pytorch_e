@@ -14,10 +14,28 @@ class ConvMixerCfg(BaseCfg):
     patch_size: int = 2
     num_classes: int = 10
 
-    drop_rate: float = 0.    
+    drop_rate: float = 0.   
+    squeeze_factor: int = 4 
 
     layer_norm_zero_init: bool = True
+    skip_connection: bool = True
 
+class SE(nn.Module):
+    def __init__(self, hidden_dim: int, squeeze_factor: int = 4):
+        super().__init__()
+        squeeze_c = hidden_dim // squeeze_factor
+        self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
+        self.excitation = nn.Sequential(
+			nn.Conv2d(hidden_dim, squeeze_c, 1),
+			nn.ReLU(inplace=True),
+			nn.Conv2d(squeeze_c , hidden_dim, 1),
+			nn.Sigmoid())
+        
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        scale = self.squeeze(x)
+        scale = self.excitation(scale)
+        return x * scale   
 # %%
 class ConvMixer(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
@@ -79,12 +97,16 @@ class BayesConvMixer(ConvMixer):
             nn.Flatten(),
         )
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.skip_connection = cfg.skip_connection
 
     def forward(self, x):
         x = self.embed(x)
         logits = self.digup(x)
         for layer in self.layers:
-            x = x + layer(x)
+            if self.skip_connection:
+                x = x + layer(x)
+            else:
+                x = layer(x)
             logits = logits + self.digup(x)
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)

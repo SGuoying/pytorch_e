@@ -14,7 +14,7 @@ def build_composer_convmixer(model_name: str = 'convmixer',
                              patch_size: int = 7,
                              kernel_size: int = 5,
                              num_classes: int = 100,
-                             layer_norm_zero_init: bool = True,
+                             layer_norm_zero_init: bool = False,
                              skip_connection: bool = True,
                              ):
     

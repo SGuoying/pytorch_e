@@ -107,7 +107,6 @@ class ConvMixerLayer(nn.Sequential):
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim, eps=7e-5),
             # nn.Dropout(drop_rate)
-            SE(hidden_dim),
             StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
 

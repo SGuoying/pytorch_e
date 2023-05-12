@@ -149,7 +149,7 @@ class CombineConvMixer(ConvMixer):
         x = self.embed(x)
         logits = self.digup(x)
         # logits = self.logits_layer_norm(logits)
-        for layer, i in self.layers:
+        for i, layer in enumerate(self.layers):
             if self.skip_connection:
                 x = x + layer(x)
             else:
@@ -212,7 +212,7 @@ input = torch.randn(2, 3, 256, 256)
 cfg = ConvMixerCfg(
     patch_size=8,
 )
-model = BayesConvMixer(cfg)
+model = CombineConvMixer(cfg)
 
 # model = Isotropic(cfg)
 output = model(input)

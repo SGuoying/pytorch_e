@@ -133,23 +133,18 @@ class CombineConvMixer(ConvMixer):
         #     nn.Flatten(),
         # )
         self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)
-        self.combine = nn.Sequential(
-            eca_layer(kernel_size=cfg.eca_kernel_size),
-            nn.LayerNorm(cfg.hidden_dim)
-        )
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
     def forward(self, x):
         x = self.embed(x)
         logits = self.digup(x)
-        logits = self.logits_layer_norm(logits)
+        # logits = self.logits_layer_norm(logits)
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)
             else:
                 x = layer(x)
-            # logits = logits + self.combine(x)
             log = self.digup(x)
             logits = logits + self.logits_layer_norm(log)
             # logits = logits + self.digup(x)

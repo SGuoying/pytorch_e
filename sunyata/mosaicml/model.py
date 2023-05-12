@@ -16,6 +16,7 @@ def build_composer_convmixer(model_name: str = 'convmixer',
                              num_classes: int = 100,
                              layer_norm_zero_init: bool = False,
                              skip_connection: bool = True,
+                             eca_kernel_size: int = 3,
                              ):
     
     cfg = ConvMixerCfg(
@@ -26,6 +27,7 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         num_classes = num_classes,
         layer_norm_zero_init = layer_norm_zero_init,
         skip_connection = skip_connection,
+        eca_kernel_size = eca_kernel_size,
     )
 
     if model_name == "convmixer":

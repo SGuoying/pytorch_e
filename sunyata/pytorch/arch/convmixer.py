@@ -6,6 +6,22 @@ import torch.nn.functional as F
 
 from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2
 
+
+# %%
+class eca_layer(nn.Module):
+    def __init__(self, kernel_size: int = 3):
+        super(eca_layer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size, padding=(kernel_size-1)//2, bias=False)
+
+    def forward(self, x: torch.Tensor):
+        assert x.ndim == 4
+        y = self.avg_pool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1,-2))
+        y = y.transpose(-1,-2).squeeze(-1)
+        return y
+    
+
 @dataclass
 class ConvMixerCfg(BaseCfg):
     num_layers: int = 8
@@ -19,6 +35,8 @@ class ConvMixerCfg(BaseCfg):
 
     layer_norm_zero_init: bool = True
     skip_connection: bool = True
+
+    eca_kernel_size: int = 3
   
 # %%
 class ConvMixer(nn.Module):
@@ -76,10 +94,11 @@ class BayesConvMixer(ConvMixer):
         if cfg.layer_norm_zero_init:
             self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
         
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
-        )
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1,1)),
+        #     nn.Flatten(),
+        # )
+        self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 

@@ -16,8 +16,11 @@ class eca_layer(nn.Module):
 
     def forward(self, x: torch.Tensor):
         assert x.ndim == 4
+        #  (batch_size, channels, 1, 1)
         y = self.avg_pool(x)
+        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
         y = self.conv(y.squeeze(-1).transpose(-1,-2))
+        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)， squeeze：(batch_size, channels, 1)变为(batch_size, channels)
         y = y.transpose(-1,-2).squeeze(-1)
         return y
     
@@ -115,6 +118,42 @@ class BayesConvMixer(ConvMixer):
         logits = self.fc(logits)
         return logits
 
+
+# %%
+class CombineConvMixer(ConvMixer):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+        
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1,1)),
+        #     nn.Flatten(),
+        # )
+        self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)
+        self.combine = nn.Sequential(
+            eca_layer(kernel_size=cfg.eca_kernel_size),
+            nn.LayerNorm(cfg.hidden_dim)
+        )
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.skip_connection = cfg.skip_connection
+
+    def forward(self, x):
+        x = self.embed(x)
+        logits = self.digup(x)
+        logits = self.logits_layer_norm(logits)
+        for layer in self.layers:
+            if self.skip_connection:
+                x = x + layer(x)
+            else:
+                x = layer(x)
+            logits = logits + self.combine(logits)
+            # logits = logits + self.digup(x)
+            # logits = self.logits_layer_norm(logits)
+        logits = self.fc(logits)
+        return logits
 # %%
 class BayesConvMixer2(ConvMixer2):
     def __init__(self, cfg: ConvMixerCfg):

@@ -149,7 +149,7 @@ class CombineConvMixer(ConvMixer):
                 x = x + layer(x)
             else:
                 x = layer(x)
-            logits = logits + self.combine(logits)
+            logits = logits + self.combine(x)
             # logits = logits + self.digup(x)
             # logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)

@@ -116,6 +116,7 @@ class BayesConvMixer(ConvMixer):
     def forward(self, x):
         x = self.embed(x)
         logits = self.digup(x)
+        logits = self.logits_layer_norm(logits)
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)

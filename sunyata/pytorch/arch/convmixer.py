@@ -113,14 +113,14 @@ class BayesConvMixer(ConvMixer):
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
-        logits = torch.zeros(1, cfg.hidden_dim)
-        self.register_buffer('logits', logits)
+        # logits = torch.zeros(1, cfg.hidden_dim)
+        # self.register_buffer('logits', logits)
 
     def forward(self, x):
         x = self.embed(x)
-        # logits = self.digup(x)
-        logits = self.logits
-        # logits = self.logits_layer_norm(logits)
+        logits = self.digup(x)
+        # logits = self.logits
+        logits = self.logits_layer_norm(logits)
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)
@@ -172,11 +172,6 @@ class CombineConvMixer(ConvMixer):
             # logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
-    
-
-
-# %%
-
 
 class BayesConvMixer2(ConvMixer2):
     def __init__(self, cfg: ConvMixerCfg):
@@ -200,17 +195,3 @@ class BayesConvMixer2(ConvMixer2):
         logits = self.fc(logits)
         return logits
         
-
-
-# %%
-input = torch.randn(2, 3, 256, 256)
-cfg = ConvMixerCfg(
-    patch_size=8,
-)
-model = CombineConvMixer(cfg)
-
-# model = Isotropic(cfg)
-output = model(input)
-output.shape
-
-# %%

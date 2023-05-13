@@ -55,7 +55,10 @@ class AvgAttnPooling2d(nn.Module):
 
     def forward(self, x):
         x = self.norm(self.pool(x).flatten(1) + self.attn(x, self.cls_q))
-        return x + self.ffn(x)
+        x =  x + self.ffn(x)
+        x_reshaped = torch.unsqueeze(x, 2)
+        x_reshaped = torch.unsqueeze(x_reshaped, 3)
+        return x_reshaped
 
     @torch.no_grad()
     def _init_weights(self, m):

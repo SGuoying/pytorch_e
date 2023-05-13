@@ -20,8 +20,8 @@ class eca_layer(nn.Module):
     def forward(self, x: torch.Tensor):
         assert x.ndim == 4
         #  (batch_size, channels, 1, 1)
-        y = self.avg_pool(x)
-        # y = self.attn_pool(x)
+        # y = self.avg_pool(x)
+        y = self.attn_pool(x)
         # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
         # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
         y = self.conv(y.squeeze(-1).transpose(-1, -2))

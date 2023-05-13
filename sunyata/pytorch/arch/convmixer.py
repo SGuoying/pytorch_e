@@ -13,18 +13,20 @@ class eca_layer(nn.Module):
     def __init__(self, dim: int, kernel_size: int = 3):
         super(eca_layer, self).__init__()
         self.attn_pool = AvgAttnPooling2d(dim=dim)
-        # self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
                               padding=(kernel_size-1)//2, bias=False)
 
     def forward(self, x: torch.Tensor):
         assert x.ndim == 4
         #  (batch_size, channels, 1, 1)
-        # y = self.avg_pool(x)
-        y = self.attn_pool(x)
-        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
+        y = self.avg_pool(x)
+        # y = self.attn_pool(x)
+        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
+        # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
         y = self.conv(y.squeeze(-1).transpose(-1, -2))
-        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)， squeeze：(batch_size, channels, 1)变为(batch_size, channels)
+        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
+        #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
         y = y.transpose(-1, -2).squeeze(-1)
         return y
 

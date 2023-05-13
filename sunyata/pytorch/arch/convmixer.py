@@ -113,10 +113,14 @@ class BayesConvMixer(ConvMixer):
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
+        logits = torch.zeros(1, cfg.hidden_dim)
+        self.register_buffer('logits', logits)
+
     def forward(self, x):
         x = self.embed(x)
-        logits = self.digup(x)
-        logits = self.logits_layer_norm(logits)
+        # logits = self.digup(x)
+        logits = self.logits
+        # logits = self.logits_layer_norm(logits)
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)
@@ -190,32 +194,12 @@ class BayesConvMixer2(ConvMixer2):
         x = self.embed(x)
         logits = self.digup(x)
         for layer in self.layers:
-            logits = self.logits_layer_norm(logits + self.digup(layer(x)))
-            logits = self.logits_layer_norm(self.digup(layer(x))) + logits
-        logits = self.fc(logits)
-        return logits
-
-    def forward(self, x):
-        x = self.embed(x)
-        logits = self.digup(x)
-        for layer, i in self.layers:
-            logits = self.logits_layer_norm(self.digup(
-                layer(x)) if i == 0 else logits + self.digup(layer(x))) + logits
-            # logits = self.logits_layer_norm(logits + self.digup(layer(x))) + logits
-        logits = self.fc(logits)
-        return logits
-
-    def forward(self, x):
-        x = self.embed(x)
-        logits = self.digup(x)
-
-        for layer, i in self.layers:
             x = layer(x)
-
-            logit = self.digup(x) if i == 0 else logits
-            logits = self.logits_layer_norm(logit) + logits
+            logits = logits + self.digup(x)
+            logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
+        
 
 
 # %%

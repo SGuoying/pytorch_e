@@ -67,19 +67,49 @@ class AvgAttnPooling2d(nn.Module):
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
+class AvgAttnPooling2dS(nn.Module):
+    def __init__(self,
+        ni:int,
+        attn_bias:bool=True,
+        # ffn_expand:int=3,
+        norm:Callable[[int], nn.Module]=nn.LayerNorm,
+        act_cls:Callable[[None], nn.Module]=nn.GELU,
+    ):
+        super().__init__()
+        self.cls_q = nn.Parameter(torch.zeros([1,ni]))
+        self.attn = AttentionPool2d(ni, attn_bias, norm)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.norm = norm(ni)
+        self.act = act_cls()
+        nn.init.trunc_normal_(self.cls_q, std=0.02)
+        self.apply(self._init_weights)
+
+    def forward(self, x):
+        x = self.norm(self.pool(x).flatten(1) + self.attn(x, self.cls_q))
+        x = self.act(x)
+        x_reshaped = torch.unsqueeze(x, 2)
+        x_reshaped = torch.unsqueeze(x_reshaped, 3)
+        return x_reshaped
+
+    @torch.no_grad()
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.trunc_normal_(m.weight, std=0.02)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
 
 
 ## clip
 # class AttentionPool2d(nn.Module):
 class Attention(nn.Module):
-    def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int, output_dim: int = None):
+    def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int):
         super().__init__()
         self.positional_embedding = nn.Parameter(torch.randn(spacial_dim ** 2 + 1, embed_dim) / embed_dim ** 0.5)
         self.k_proj = nn.Linear(embed_dim, embed_dim)
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.v_proj = nn.Linear(embed_dim, embed_dim)
-        self.c_proj = nn.Linear(embed_dim, output_dim or embed_dim)
+        self.c_proj = nn.Linear(embed_dim, embed_dim)
         self.num_heads = num_heads
 
     def forward(self, x):

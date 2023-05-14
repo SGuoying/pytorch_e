@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d
+from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d, AvgAttnPooling2dS
 
 from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2
 
@@ -12,7 +12,7 @@ from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2
 class eca_layer(nn.Module):
     def __init__(self, dim: int, kernel_size: int = 3):
         super(eca_layer, self).__init__()
-        self.attn_pool = AvgAttnPooling2d(dim=dim)
+        self.attn_pool = AvgAttnPooling2dS(dim=dim)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
                               padding=(kernel_size-1)//2, bias=False)

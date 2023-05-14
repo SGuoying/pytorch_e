@@ -118,6 +118,7 @@ class ConvMixerLayer2(nn.Sequential):
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim),
             )),
+            SE(hidden_dim),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim), 

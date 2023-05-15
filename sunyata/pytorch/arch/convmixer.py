@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d, AvgAttnPooling2dS
 
-from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2
+from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayereca
 
 
 # %%
@@ -88,7 +88,7 @@ class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
         self.layers = nn.ModuleList([
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            ConvMixerLayereca(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
@@ -101,9 +101,9 @@ class ConvMixereca(ConvMixer):
         )
 
         self.digup = nn.Sequential(
-            # nn.AdaptiveAvgPool2d((1, 1)),
-            # nn.Flatten(),
-            eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            # eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
 

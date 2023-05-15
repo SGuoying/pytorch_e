@@ -9,10 +9,10 @@ class AttentionPool2d(nn.Module):
     def __init__(self,
         dim:int,
         bias:bool=True,
-        norm:Callable[[int], nn.Module]=nn.LayerNorm
+        # norm:Callable[[int], nn.Module]=nn.LayerNorm
     ):
         super().__init__()
-        self.norm = norm(dim)
+        self.norm = nn.LayerNorm(dim)
         self.q = nn.Linear(dim, dim, bias=bias)
         self.vk = nn.Linear(dim, dim*2, bias=bias)
         self.proj = nn.Linear(dim, dim)
@@ -72,20 +72,20 @@ class AvgAttnPooling2dS(nn.Module):
         dim:int,
         attn_bias:bool=True,
         # ffn_expand:int=3,
-        norm:Callable[[int], nn.Module]=nn.LayerNorm,
+        # norm:Callable[[int], nn.Module]=nn.LayerNorm,
         act_cls:Callable[[None], nn.Module]=nn.GELU,
     ):
         super().__init__()
         self.cls_q = nn.Parameter(torch.zeros([1,dim]))
-        self.attn = AttentionPool2d(dim, attn_bias, norm)
+        self.attn = AttentionPool2d(dim, attn_bias)
         self.pool = nn.AdaptiveAvgPool2d(1)
-        self.norm = norm(dim)
+        # self.norm = norm(dim)
         self.act = act_cls()
         nn.init.trunc_normal_(self.cls_q, std=0.02)
         self.apply(self._init_weights)
 
     def forward(self, x):
-        x = self.norm(self.pool(x).flatten(1) + self.attn(x, self.cls_q))
+        x = self.pool(x).flatten(1) + self.attn(x, self.cls_q)
         x = self.act(x)
         x_reshaped = torch.unsqueeze(x, 2)
         x_reshaped = torch.unsqueeze(x_reshaped, 3)

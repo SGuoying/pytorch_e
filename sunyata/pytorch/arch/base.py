@@ -95,6 +95,30 @@ class SE(nn.Module):
         scale = self.squeeze(x)
         scale = self.excitation(scale)
         return x * scale   
+    
+
+class eca_layer(nn.Module):
+    def __init__(self, dim: int, kernel_size: int = 3):
+        super(eca_layer, self).__init__()
+        # self.attn_pool = AvgAttnPooling2dS(dim=dim)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
+                              padding=(kernel_size-1)//2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor):
+        assert x.ndim == 4
+        #  (batch_size, channels, 1, 1)
+        y = self.avg_pool(x)
+        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
+        # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
+        y = self.conv(y.squeeze(-1).transpose(-1, -2))
+        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
+        #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
+        y = y.transpose(-1, -2).unsqueeze(-1)
+        y = self.sigmoid(y)
+        return x * y.expand_as(x)
+    
 
 class ConvMixerLayer(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
@@ -110,6 +134,21 @@ class ConvMixerLayer(nn.Sequential):
             StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
 
+class ConvMixerLayereca(nn.Sequential):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
+        super().__init__(
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim, eps=7e-5),
+            # nn.Dropout(drop_rate),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim, eps=7e-5),
+            # nn.Dropout(drop_rate)
+            eca_layer(hidden_dim, kernel_size=3),
+            StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
+        )
+        
 class ConvMixerLayer2(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__(

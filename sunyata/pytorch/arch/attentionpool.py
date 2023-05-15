@@ -51,7 +51,7 @@ class AvgAttnPooling2d(nn.Module):
             nn.Linear(int(dim*ffn_expand), dim)
         )
         nn.init.trunc_normal_(self.cls_q, std=0.02)
-        # self.apply(self._init_weights)
+        self.apply(self._init_weights)
 
     def forward(self, x):
         x = self.norm(self.pool(x).flatten(1) + self.attn(x, self.cls_q))

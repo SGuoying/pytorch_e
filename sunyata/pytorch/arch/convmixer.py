@@ -12,7 +12,6 @@ from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, 
 class eca_layer(nn.Module):
     def __init__(self, dim: int, kernel_size: int = 3):
         super(eca_layer, self).__init__()
-        # self.attn_pool = AvgAttnPooling2dS(dim=dim)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
                               padding=(kernel_size-1)//2, bias=False)
@@ -99,8 +98,6 @@ class ConvMixer(nn.Module):
         x = self.digup(x)
         return x
 
-# %%
-
 
 class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -134,7 +131,39 @@ class ConvMixereca(ConvMixer):
         return x
 
 
-# %%
+class ConvMixerattn(ConvMixer):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+        self.layers = nn.ModuleList([
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
+
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
+                      stride=cfg.patch_size),
+            nn.GELU(),
+            # eps>6.1e-5 to avoid nan in half precision
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        )
+
+        self.digup = nn.Sequential(
+            # nn.AdaptiveAvgPool2d((1, 1)),
+            AvgAttnPooling2dS(dim=cfg.hidden_dim),
+            nn.Flatten(),
+            # eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+
+    def forward(self, x):
+        x = self.embed(x)
+        # x = self.layers(x)
+        for layer in self.layers:
+            x = x + layer(x)
+        x = self.digup(x)
+        return x
+
+
 class BayesConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -169,7 +198,6 @@ class BayesConvMixer(ConvMixer):
         return logits
 
 
-# %%
 class CombineConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -190,7 +218,7 @@ class CombineConvMixer(ConvMixer):
     def forward(self, x):
         x = self.embed(x)
         logits = self.digup(x)
-        # logits = self.logits_layer_norm(logits)
+        logits = self.logits_layer_norm(logits)
         for i, layer in enumerate(self.layers):
             if self.skip_connection:
                 x = x + layer(x)
@@ -198,7 +226,7 @@ class CombineConvMixer(ConvMixer):
                 x = layer(x)
             
             if i == 0:
-                logit = self.digup(x) + logits
+                logit = self.digup(x)
             else:
                 logit = logits + self.digup(x)
             
@@ -209,6 +237,7 @@ class CombineConvMixer(ConvMixer):
             # logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
+
 
 class BayesConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -239,6 +268,7 @@ class BayesConvMixereca(ConvMixer):
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
+
 
 class BayesConvMixerattn(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -274,6 +304,7 @@ class BayesConvMixerattn(ConvMixer):
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
+   
     
 class BayesConvMixerecaAttn(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -304,3 +335,4 @@ class BayesConvMixerecaAttn(ConvMixer):
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
+    

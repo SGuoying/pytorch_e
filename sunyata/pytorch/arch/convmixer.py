@@ -226,7 +226,7 @@ class CombineConvMixer(ConvMixer):
                 x = layer(x)
             
             if i == 0:
-                logit = self.digup(x)
+                logit = self.digup(x) + logits
             else:
                 logit = logits + self.digup(x)
             

@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 from torchvision.ops import StochasticDepth
 
+from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2dS
+
 
 class RevSGD(torch.optim.Optimizer):
     def __init__(
@@ -100,7 +102,7 @@ class SE(nn.Module):
 class eca_layer(nn.Module):
     def __init__(self, dim: int, kernel_size: int = 3):
         super(eca_layer, self).__init__()
-        # self.attn_pool = AvgAttnPooling2dS(dim=dim)
+        self.attn_pool = AvgAttnPooling2dS(dim=dim)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
                               padding=(kernel_size-1)//2, bias=False)
@@ -110,6 +112,7 @@ class eca_layer(nn.Module):
         assert x.ndim == 4
         #  (batch_size, channels, 1, 1)
         y = self.avg_pool(x)
+        # y = self.attn_pool(x)
         # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
         # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
         y = self.conv(y.squeeze(-1).transpose(-1, -2))
@@ -119,7 +122,23 @@ class eca_layer(nn.Module):
         y = self.sigmoid(y)
         return x * y.expand_as(x)
     
+class eca_layer2(nn.Module):
+    def __init__(self, channel, k_size):
+        super(eca_layer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.k_size = k_size
+        self.conv = nn.Conv1d(channel, channel, kernel_size=k_size, bias=False, groups=channel)
+        self.sigmoid = nn.Sigmoid()
 
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x)
+        y = nn.functional.unfold(y.transpose(-1, -3), kernel_size=(1, self.k_size), padding=(0, (self.k_size - 1) // 2))
+        y = self.conv(y.transpose(-1, -2)).unsqueeze(-1)
+        y = self.sigmoid(y)
+        x = x * y.expand_as(x)
+        return x
 class ConvMixerLayer(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__(
@@ -145,7 +164,7 @@ class ConvMixerLayereca(nn.Sequential):
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim, eps=7e-5),
             # nn.Dropout(drop_rate)
-            eca_layer(hidden_dim, kernel_size=3),
+            eca_layer2(hidden_dim, kernel_size=3),
             StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
         

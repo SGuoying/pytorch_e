@@ -123,7 +123,7 @@ class eca_layer(nn.Module):
         return x * y.expand_as(x)
     
 class eca_layer2(nn.Module):
-    def __init__(self, channel, k_size):
+    def __init__(self, channel: int, k_size: int=3):
         super(eca_layer, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.k_size = k_size
@@ -164,7 +164,7 @@ class ConvMixerLayereca(nn.Sequential):
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim, eps=7e-5),
             # nn.Dropout(drop_rate)
-            eca_layer2(hidden_dim, k_size=3),
+            eca_layer2(hidden_dim),
             StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
         

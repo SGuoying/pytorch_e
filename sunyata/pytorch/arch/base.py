@@ -99,9 +99,9 @@ class SE(nn.Module):
         return x * scale   
     
 
-class eca_layer(nn.Module):
+class ecablock(nn.Module):
     def __init__(self, dim: int, kernel_size: int = 3):
-        super(eca_layer, self).__init__()
+        super(ecablock, self).__init__()
         self.attn_pool = AvgAttnPooling2dS(dim=dim)
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,

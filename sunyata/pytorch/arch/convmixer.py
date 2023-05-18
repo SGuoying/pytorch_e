@@ -103,10 +103,10 @@ class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
         self.layers = nn.ModuleList([
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate),
-            ecablock(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
+        self.eca = ecablock(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
 
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
@@ -127,7 +127,9 @@ class ConvMixereca(ConvMixer):
         x = self.embed(x)
         # x = self.layers(x)
         for layer in self.layers:
-            x = x + layer(x)
+            x1 = layer(x)
+            x = self.eca(x1) + x
+            # x = x + layer(x)
         x = self.digup(x)
         return x
 

@@ -124,7 +124,7 @@ class eca_layer(nn.Module):
     
 class eca(nn.Module):
     def __init__(self, channel: int, k_size: int=3):
-        super(eca_layer, self).__init__()
+        super(eca, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.k_size = k_size
         self.conv = nn.Conv1d(channel, channel, kernel_size=k_size, bias=False, groups=channel)

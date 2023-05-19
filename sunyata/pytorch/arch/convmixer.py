@@ -184,13 +184,13 @@ class BayesConvMixer(ConvMixer):
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
-        logits = torch.zeros(1, cfg.hidden_dim)
-        self.register_buffer('logits', logits)
+        # logits = torch.zeros(1, cfg.hidden_dim)
+        # self.register_buffer('logits', logits)
 
     def forward(self, x):
         x = self.embed(x)
-        # logits = self.digup(x)
-        logits = self.logits
+        logits = self.digup(x)
+        # logits = self.logits
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)
@@ -256,13 +256,13 @@ class BayesConvMixereca(ConvMixer):
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
-        logits = torch.zeros(1, cfg.hidden_dim)
-        self.register_buffer('logits', logits)
+        # logits = torch.zeros(1, cfg.hidden_dim)
+        # self.register_buffer('logits', logits)
 
     def forward(self, x):
         x = self.embed(x)
-        # logits = self.digup(x)
-        logits = self.logits
+        logits = self.digup(x)
+        # logits = self.logits
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)

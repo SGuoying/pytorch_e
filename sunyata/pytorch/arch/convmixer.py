@@ -23,9 +23,7 @@ class eca_layer(nn.Module):
         y = torch.unsqueeze(x, 2)
         # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
         # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
-
-        # y = self.conv(y.squeeze(-1).transpose(-1, -2))
-        y =  self.conv(y.transpose(-1, -2))
+        y = self.conv(y.transpose(-1, -2))
         # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
         #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
         y = y.transpose(-1, -2).squeeze(-1)

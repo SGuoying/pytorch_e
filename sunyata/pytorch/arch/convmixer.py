@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d, AvgAttnPooling2dS
 
-from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayereca, ecablock
+from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayereca, ecablock
 
 
 # %%
@@ -226,22 +226,24 @@ class BayesConvMixereca(ConvMixer):
         logits = self.fc(logits)
         return logits
 
-class BayesConvMixerattn(ConvMixer):
+class BayesSEConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
-        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        # self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.logits_layer_norm = SE(hidden_dim=cfg.hidden_dim)
         if cfg.layer_norm_zero_init:
             self.logits_layer_norm.weight.data = torch.zeros(
                 self.logits_layer_norm.weight.data.shape)
 
-        # self.digup = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
         self.digup = nn.Sequential(
-            # nn.AdaptiveAvgPool2d((1,1)),
-            AvgAttnPooling2dS(dim=cfg.hidden_dim),
-            nn.Flatten(),
+            nn.AdaptiveAvgPool2d((1,1)),
+            # nn.Flatten(),
         )
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+            )
         self.skip_connection = cfg.skip_connection
 
         # logits = torch.zeros(1, cfg.hidden_dim)

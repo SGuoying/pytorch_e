@@ -193,7 +193,7 @@ class BayesConvMixer(ConvMixer):
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
+            # nn.Flatten(),
         )
         # self.digup = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)

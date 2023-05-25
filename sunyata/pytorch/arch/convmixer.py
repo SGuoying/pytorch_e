@@ -81,6 +81,36 @@ class ConvMixer(nn.Module):
         x = self.digup(x)
         return x
 
+class ConvMixer2(nn.Module):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__()
+
+        self.layers = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
+
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
+                      stride=cfg.patch_size),
+            nn.GELU(),
+            # eps>6.1e-5 to avoid nan in half precision
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        )
+
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+
+        self.cfg = cfg
+
+    def forward(self, x):
+        x = self.embed(x)
+        x = self.layers(x)
+        x = self.digup(x)
+        return x
 
 class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):

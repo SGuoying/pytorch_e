@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2
+from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2
 from sunyata.pytorch_lightning.base import BaseModule
 
 
@@ -16,7 +16,7 @@ class IsotropicCfg(BaseCfg):
     num_classes: int = 10
 
     drop_rate: float = 0.
-    layer_norm_zero_init: bool = True    
+    layer_norm_zero_init: bool = False    
 
 # %%
 class Isotropic(BaseModule):
@@ -106,15 +106,17 @@ class BayesIsotropic2(Isotropic2):
     def __init__(self, cfg: IsotropicCfg):
         super().__init__(cfg)
 
-        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        if cfg.layer_norm_zero_init:
-            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
-
+        # self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.logits_layer_norm = SE(hidden_dim=cfg.hidden_dim)
+        
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
+            # nn.Flatten(),
         )
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
 
 
     def forward(self, x):

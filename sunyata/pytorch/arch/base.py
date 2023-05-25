@@ -95,7 +95,7 @@ class SE(nn.Module):
     def forward(self, x):
         b, c, _, _ = x.size()
         # scale = self.squeeze(x)
-        scale = self.excitation(scale)
+        scale = self.excitation(x)
         return x * scale   
     
 

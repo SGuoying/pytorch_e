@@ -120,20 +120,23 @@ class ConvMixereca(ConvMixer):
 class BayesConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
+        self.layers = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
 
-        # self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        self.logits_layer_norm = AvgAttnPooling2dS(dim=cfg.hidden_dim)
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         if cfg.layer_norm_zero_init:
             self.logits_layer_norm.weight.data = torch.zeros(
                 self.logits_layer_norm.weight.data.shape)
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
-            # nn.Flatten(),
+            nn.Flatten(),
         )
         # self.digup = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.skip_connection = cfg.skip_connection
+        # self.skip_connection = cfg.skip_connection
 
         # logits = torch.zeros(1, cfg.hidden_dim)
         # self.register_buffer('logits', logits)
@@ -141,12 +144,11 @@ class BayesConvMixer(ConvMixer):
     def forward(self, x):
         x = self.embed(x)
         logits = self.digup(x)
-        # logits = self.logits
         for layer in self.layers:
-            if self.skip_connection:
-                x = x + layer(x)
-            else:
-                x = layer(x)
+            # if self.skip_connection:
+            #     x = x + layer(x)
+            # else:
+            x = layer(x)
             logits = logits + self.digup(x)
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)

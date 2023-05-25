@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d, AvgAttnPooling2dS
 
-from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayer3, ConvMixerLayereca, ecablock
+from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayer3, ecablock
 
 
 # %%
@@ -142,6 +142,8 @@ class ConvMixer3(nn.Module):
             x = x + layer(x)
         x = self.digup(x)
         return x
+    
+
 class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -288,7 +290,8 @@ class BayesConvMixereca(ConvMixer):
         logits = self.fc(logits)
         return logits
 
-class BayesSEConvMixer(ConvMixer):
+
+class BayesSEConvMixer2(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
         self.layers = nn.Sequential(*[
@@ -323,6 +326,3 @@ class BayesSEConvMixer(ConvMixer):
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
-   
-
-    

@@ -208,7 +208,7 @@ class ResNet2(ResNet):
 
 
 
-def Resnet50( groups=1, width_per_group=64):
+def Resnet50(num_classes=100, **kwargs):
     # https://download.pytorch.org/models/resnet101-5d3b4d8f.pth
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=1000, groups=groups, width_per_group=width_per_group)
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, **kwargs)
  

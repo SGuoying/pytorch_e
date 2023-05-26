@@ -25,7 +25,7 @@ def build_composer_resnet(model_name: str = 'resnet50',
         num_classes (int, optional): Number of classes in the classification task. Default: ``1000``.
     """
     if model_name == "resnet50":
-        model = Resnet50(num_classes=num_classes)
+        model = Resnet50(num_classes=num_classes, groups=1, width_per_group=64)
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")
 

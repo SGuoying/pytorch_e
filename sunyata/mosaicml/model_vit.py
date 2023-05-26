@@ -6,38 +6,36 @@ from composer.models import ComposerClassifier
 from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
 
-from sunyata.pytorch.arch.convmixer import  BayesSEConvMixer2, ConvMixer2, ConvMixerCfg, ConvMixer, BayesConvMixer
+from sunyata.pytorch.arch.vision_transformer import ViT, ViTCfg, bayes_ViT
+
+
 # %%
-def build_composer_convmixer(model_name: str = 'convmixer',
+def build_composer_convmixer(model_name: str = 'vit',
                              num_layers: int = 8,
                              hidden_dim: int = 256,
-                             patch_size: int = 7,
-                             kernel_size: int = 5,
+                             image_size: int = 224,
+                             patch_size: int = 32,
+                             num_heads: int = 8,
                              num_classes: int = 100,
-                             layer_norm_zero_init: bool = False,
-                             skip_connection: bool = True,
-                             eca_kernel_size: int = 3,
+                             expanded_dim: int = 512,
+                             head_dim: int = 32,
                              ):
     
-    cfg = ConvMixerCfg(
+    cfg = ViTCfg(
         num_layers = num_layers,
         hidden_dim = hidden_dim,
+        image_size = image_size,
         patch_size = patch_size,
-        kernel_size = kernel_size,
+        num_heads = num_heads,
         num_classes = num_classes,
-        layer_norm_zero_init = layer_norm_zero_init,
-        skip_connection = skip_connection,
-        eca_kernel_size = eca_kernel_size,
+        expanded_dim = expanded_dim,
+        head_dim = head_dim,
     )
 
-    if model_name == "convmixer":
-        model = ConvMixer(cfg)
-    elif model_name == "bayesse_convmixer":
-        model = BayesSEConvMixer2(cfg)
-    elif model_name == "bayes_convmixer":
-        model = BayesConvMixer(cfg)
-    elif model_name == "convmixer2":
-        model = ConvMixer2(cfg)
+    if model_name == "vit":
+        model = ViT(cfg)
+    elif model_name == "bayesvit":
+        model = bayes_ViT(cfg)
 
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

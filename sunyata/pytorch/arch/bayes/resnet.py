@@ -187,7 +187,7 @@ class ResNet2(ResNet):
 
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
-        log_prior = self.log_prior.repeat(batch_size, 1)
+        log_prior = torch.rearrange(self.log_prior, '1 c h w -> b c h w', b=batch_size)
 
         x = self.conv1(x)
         x = self.bn1(x)

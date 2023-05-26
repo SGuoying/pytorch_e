@@ -1,5 +1,6 @@
 # %%
 from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from einops import rearrange
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -187,7 +188,7 @@ class ResNet2(ResNet):
 
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
-        log_prior = torch.rearrange(self.log_prior, '1 c h w -> b c h w', b=batch_size)
+        log_prior = rearrange(self.log_prior, '1 c h w -> b c h w', b=batch_size)
 
         x = self.conv1(x)
         x = self.bn1(x)

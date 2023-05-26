@@ -9,7 +9,7 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
 from torchvision.models import resnet
 
-from sunyata.pytorch.arch.bayes.resnet import ResNet2, resnet50
+from sunyata.pytorch.arch.bayes.resnet import ResNet2, Resnet50
 
 
 def build_composer_resnet(model_name: str = 'resnet50',
@@ -24,12 +24,10 @@ def build_composer_resnet(model_name: str = 'resnet50',
             Default: ``'cross_entropy'``.
         num_classes (int, optional): Number of classes in the classification task. Default: ``1000``.
     """
-    model_fn = getattr(ResNet2, model_name)
-    model = model_fn(num_classes=num_classes, groups=1, width_per_group=64)
-    # if model_name == "resnet50":
-    #     model = resnet50(num_classes=num_classes, groups=1, width_per_group=64)
-    # else:
-    #     raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")
+    if model_name == "resnet50":
+        model = Resnet50(num_classes=num_classes)
+    else:
+        raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")
 
     # Specify model initialization
     def weight_init(w: torch.nn.Module):

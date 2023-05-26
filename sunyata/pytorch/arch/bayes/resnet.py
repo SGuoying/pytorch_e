@@ -207,41 +207,8 @@ class ResNet2(ResNet):
         return self.fc(log_prior)
 
 
-def _resnet(
-    block: Type[Union[BasicBlock, Bottleneck]],
-    layers: List[int],
-    **kwargs: Any,
-) -> ResNet2:
 
-    model = ResNet2(block, layers, **kwargs)
-    return model
-
-from torchvision.models._api import register_model
-@register_model()
-def resnet50(**kwargs: Any) -> ResNet2:
-    """ResNet-50 from `Deep Residual Learning for Image Recognition <https://arxiv.org/pdf/1512.03385.pdf>`__.
-
-    .. note::
-       The bottleneck of TorchVision places the stride for downsampling to the second 3x3
-       convolution while the original paper places it to the first 1x1 convolution.
-       This variant improves the accuracy and is known as `ResNet V1.5
-       <https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch>`_.
-
-    Args:
-        weights (:class:`~torchvision.models.ResNet50_Weights`, optional): The
-            pretrained weights to use. See
-            :class:`~torchvision.models.ResNet50_Weights` below for
-            more details, and possible values. By default, no pre-trained
-            weights are used.
-        progress (bool, optional): If True, displays a progress bar of the
-            download to stderr. Default is True.
-        **kwargs: parameters passed to the ``torchvision.models.resnet.ResNet``
-            base class. Please refer to the `source code
-            <https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py>`_
-            for more details about this class.
-
-    .. autoclass:: torchvision.models.ResNet50_Weights
-        :members:
-    """
-
-    return _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)
+def Resnet50( groups=1, width_per_group=64):
+    # https://download.pytorch.org/models/resnet101-5d3b4d8f.pth
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=1000, groups=groups, width_per_group=width_per_group)
+ 

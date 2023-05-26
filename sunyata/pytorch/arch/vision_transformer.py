@@ -116,7 +116,7 @@ class transformer(nn.Module):
 
 class ViT(nn.Module):
     def __init__(self, cfg: ViTCfg):
-        super().__init__(cfg)
+        super().__init__()
         image_height, image_width = pair(cfg.image_size)
         patch_height, patch_width = pair(cfg.patch_size)
 

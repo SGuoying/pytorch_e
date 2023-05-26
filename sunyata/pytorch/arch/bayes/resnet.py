@@ -211,14 +211,14 @@ def _resnet(
     block: Type[Union[BasicBlock, Bottleneck]],
     layers: List[int],
     **kwargs: Any,
-) -> ResNet:
+) -> ResNet2:
 
     model = ResNet2(block, layers, **kwargs)
     return model
 
 from torchvision.models._api import register_model
 @register_model()
-def resnet50(**kwargs: Any) -> ResNet:
+def resnet50(**kwargs: Any) -> ResNet2:
     """ResNet-50 from `Deep Residual Learning for Image Recognition <https://arxiv.org/pdf/1512.03385.pdf>`__.
 
     .. note::

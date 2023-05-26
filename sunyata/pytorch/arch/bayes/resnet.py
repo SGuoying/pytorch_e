@@ -179,6 +179,7 @@ class ResNet2(ResNet):
             nn.Flatten(),
             nn.Linear(512 * block.expansion, num_classes)
             )
+        self.pl = nn.AdaptiveAvgPool2d((1, 1))
 
         log_prior = torch.zeros(1, 2048, 1, 1)
         self.register_buffer('log_prior', log_prior)
@@ -188,7 +189,9 @@ class ResNet2(ResNet):
 
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
-        log_prior = rearrange(self.log_prior, '1 c h w -> b c h w', b=batch_size)
+        # log_prior = rearrange(self.log_prior, '1 c h w -> b c h w', b=batch_size)
+        log_prior = self.log_prior.expand_as(x)
+        log_prior = self.pl(log_prior)
 
         x = self.conv1(x)
         x = self.bn1(x)

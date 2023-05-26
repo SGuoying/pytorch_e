@@ -211,4 +211,7 @@ class ResNet2(ResNet):
 def Resnet50(num_classes=100, **kwargs):
     # https://download.pytorch.org/models/resnet101-5d3b4d8f.pth
     return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, **kwargs)
- 
+
+def bayesResnet50(num_classes=100, **kwargs):
+    # https://download.pytorch.org/models/resnet101-5d3b4d8f.pth
+    return ResNet2(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, **kwargs)

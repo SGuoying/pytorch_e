@@ -179,7 +179,7 @@ class ResNet2(ResNet):
             nn.Linear(512 * block.expansion, num_classes)
             )
 
-        log_prior = torch.zeros(1, 2048)
+        log_prior = torch.zeros(1, 2048, 1, 1)
         self.register_buffer('log_prior', log_prior)
         # self.logits_layer_norm = nn.LayerNorm(2048)
         self.logits_layer_norm = SE(2048)
@@ -188,7 +188,6 @@ class ResNet2(ResNet):
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
         log_prior = self.log_prior.repeat(batch_size, 1)
-        # log_priors = torch.empty(0)
 
         x = self.conv1(x)
         x = self.bn1(x)

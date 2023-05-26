@@ -167,7 +167,7 @@ class ResNet2(ResNet):
             *[nn.Sequential(
                 nn.Conv2d(64 * i * expansion, 2048, kernel_size=1),
                 nn.AdaptiveAvgPool2d((1, 1)),
-                nn.Flatten(),
+                # nn.Flatten(),
                 ) for i in (1, 2, 4) 
                 ],
             nn.Sequential(
@@ -188,7 +188,6 @@ class ResNet2(ResNet):
 
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
-        # log_prior = rearrange(self.log_prior, '1 c h w -> b c h w', b=batch_size)
         log_prior = self.log_prior.repeat(batch_size, 1)
         log_prior = torch.unsqueeze(log_prior, dim=-1)
         log_prior = torch.unsqueeze(log_prior, dim=-1)
@@ -218,3 +217,7 @@ def Resnet50(num_classes=100, **kwargs):
 def bayesResnet50(num_classes=100, **kwargs):
     # https://download.pytorch.org/models/resnet101-5d3b4d8f.pth
     return ResNet2(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, **kwargs)
+
+def bayesResnet(num_classes=100, **kwargs):
+    # https://download.pytorch.org/models/resnet101-5d3b4d8f.pth
+    return BayesResNet2(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, **kwargs)

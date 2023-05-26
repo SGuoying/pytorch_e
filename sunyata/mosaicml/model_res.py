@@ -9,7 +9,7 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
 from torchvision.models import resnet
 
-from sunyata.pytorch.arch.bayes.resnet import ResNet2, Resnet50, bayesResnet50
+from sunyata.pytorch.arch.bayes.resnet import ResNet2, Resnet50, bayesResnet, bayesResnet50
 
 
 def build_composer_resnet(model_name: str = 'resnet50',
@@ -26,6 +26,8 @@ def build_composer_resnet(model_name: str = 'resnet50',
     """
     if model_name == "resnet50":
         model = Resnet50(num_classes=num_classes, groups=1, width_per_group=64)
+    elif model_name == "bayes_resnet":
+        model = bayesResnet(num_classes=num_classes, groups=1, width_per_group=64)
     elif model_name == "bayes_resnet50":
         model = bayesResnet50(num_classes=num_classes, groups=1, width_per_group=64)
     else:

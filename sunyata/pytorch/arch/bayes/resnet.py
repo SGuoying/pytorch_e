@@ -138,6 +138,26 @@ class BayesResNet2(ResNet):
                 # log_prior = F.log_softmax(log_prior, dim=-1)
         return self.fc(log_prior)
 
+
+class eca_layer(nn.Module):
+    def __init__(self, dim: int, kernel_size: int = 3):
+        super(eca_layer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
+                              padding=(kernel_size-1)//2, bias=False)
+
+    def forward(self, x: torch.Tensor):
+        # assert x.ndim == 4
+        #  (batch_size, channels, 1, 1)
+        # y = self.avg_pool(x)
+        y = torch.unsqueeze(x, 2)
+        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
+        # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
+        y = self.conv(y.transpose(-1, -2))
+        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
+        #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
+        y = y.transpose(-1, -2).squeeze(-1)
+        return y
 # %%
 class ResNet2(ResNet):
    def __init__(
@@ -166,31 +186,26 @@ class ResNet2(ResNet):
         self.digups = nn.ModuleList([
             *[nn.Sequential(
                 nn.Conv2d(64 * i * expansion, 2048, kernel_size=1),
-                nn.AdaptiveAvgPool2d((1, 1)),
+                eca_layer(2048),
+                # nn.AdaptiveAvgPool2d((1, 1)),
                 # nn.Flatten(),
                 ) for i in (1, 2, 4) 
                 ],
             nn.Sequential(
-                self.avgpool,
+                eca_layer(2048),
+                # self.avgpool,
                 # nn.Flatten(),
             )
         ])
-        self.fc = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(512 * block.expansion, num_classes)
-            )
 
         log_prior = torch.zeros(1, 2048)
         self.register_buffer('log_prior', log_prior)
-        # self.logits_layer_norm = nn.LayerNorm(2048)
-        self.logits_layer_norm = SE(2048)
+        self.logits_layer_norm = nn.LayerNorm(2048)
         # self.logits_bias = Parameter(torch.zeros(1, num_classes), requires_grad=True)
 
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
         log_prior = self.log_prior.repeat(batch_size, 1)
-        log_prior = torch.unsqueeze(log_prior, dim=-1)
-        log_prior = torch.unsqueeze(log_prior, dim=-1)
 
         x = self.conv1(x)
         x = self.bn1(x)

@@ -28,7 +28,7 @@ def build_composer_resnet(model_name: str = 'resnet50',
         model = Resnet50(num_classes=num_classes, groups=1, width_per_group=64)
     elif model_name == "bayes_resnet":
         model = bayesResnet(num_classes=num_classes, groups=1, width_per_group=64)
-    elif model_name == "bayes_resnet50":
+    elif model_name == "bayes_resnet_se":
         model = bayesResnet50(num_classes=num_classes, groups=1, width_per_group=64)
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

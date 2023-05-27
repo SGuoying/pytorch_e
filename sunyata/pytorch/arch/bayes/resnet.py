@@ -140,24 +140,18 @@ class BayesResNet2(ResNet):
 
 
 class eca_layer(nn.Module):
-    def __init__(self, dim: int, kernel_size: int = 3):
+    def __init__(self, kernel_size: int = 3):
         super(eca_layer, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
-                              padding=(kernel_size-1)//2, bias=False)
+        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size, padding=(kernel_size-1)//2, bias=False)
 
     def forward(self, x: torch.Tensor):
-        # assert x.ndim == 4
-        #  (batch_size, channels, 1, 1)
-        # y = self.avg_pool(x)
-        y = torch.unsqueeze(x, 2)
-        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
-        # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
-        y = self.conv(y.transpose(-1, -2))
-        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
-        #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
-        y = y.transpose(-1, -2).squeeze(-1)
+        assert x.ndim == 4
+        y = self.avg_pool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1,-2))
+        y = y.transpose(-1,-2).squeeze(-1)
         return y
+    
 # %%
 class ResNet2(ResNet):
    def __init__(
@@ -186,13 +180,13 @@ class ResNet2(ResNet):
         self.digups = nn.ModuleList([
             *[nn.Sequential(
                 nn.Conv2d(64 * i * expansion, 2048, kernel_size=1),
-                eca_layer(2048),
+                eca_layer(3),
                 # nn.AdaptiveAvgPool2d((1, 1)),
                 # nn.Flatten(),
                 ) for i in (1, 2, 4) 
                 ],
             nn.Sequential(
-                eca_layer(2048),
+                eca_layer(3),
                 # self.avgpool,
                 # nn.Flatten(),
             )

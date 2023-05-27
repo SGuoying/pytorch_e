@@ -166,21 +166,31 @@ class ConvMixerLayer2(nn.Sequential):
             nn.BatchNorm2d(hidden_dim), 
             StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
-
+class ConvMixerLayer3(nn.Sequential):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
+        super().__init__(
+            Residual(nn.Sequential(
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
+                nn.GELU(),
+                nn.BatchNorm2d(hidden_dim),
+                nn.Conv2d(hidden_dim, hidden_dim, 7, stride=1, padding=9, groups=hidden_dim, dilation=3),
+                nn.GELU(),
+                nn.BatchNorm2d(hidden_dim),
+            )),
+            # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
+            # nn.GELU(),
+            # nn.BatchNorm2d(hidden_dim, eps=7e-5),
+            # nn.Dropout(drop_rate),
+            
+            # nn.Dropout(drop_rate),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            # nn.Dropout(drop_rate)
+            StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
+        )
         
 def exists(val):
     return val is not None
 def default(val, d):
     return val if exists(val) else d
-
-class LayerNorm(nn.Module):
-    def __init__(self, dim, scale = True):
-        super().__init__()
-        self.learned_gamma = nn.Parameter(torch.ones(dim)) if scale else None
-
-        self.register_buffer('gamma', torch.ones(dim), persistent = False)
-        self.register_buffer('beta', torch.zeros(dim), persistent = False)
-
-    def forward(self, x):
-        return F.layer_norm(x, x.shape[-1:], default(self.learned_gamma, self.gamma), self.beta)
-

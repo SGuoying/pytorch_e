@@ -20,7 +20,7 @@ from packaging import version
 from torchmetrics import MetricCollection
 from torchvision.models import _utils, resnet
 
-from sunyata.pytorch.arch.deeplabv3 import DeepLabHead
+from sunyata.pytorch.arch.deeplabv3 import DeepLabHead, IntermediateLayerGetter
 
 __all__ = ['deeplabv3', 'build_composer_deeplabv3']
 
@@ -47,39 +47,9 @@ class SimpleSegmentationModel(torch.nn.Module):
 def deeplabv3(num_classes: int,
               backbone_arch: str = 'resnet50',
               backbone_weights: Optional[str] = None,
-              sync_bn: bool = False,
-              init_fn: Optional[Callable] = None):
-    """Helper function to build a mmsegmentation DeepLabV3 model.
+              ):
+   
 
-    Args:
-        num_classes (int): Number of classes in the segmentation task.
-        backbone_arch (str, optional): The architecture to use for the backbone. Must be either
-            [``'resnet50'``, ``'resnet101'``]. Default: ``'resnet101'``.
-        backbone_weights (str, optional): If specified, the PyTorch pre-trained weights to load for the backbone.
-            Currently, only ['IMAGENET1K_V1', 'IMAGENET1K_V2'] are supported. Default: ``None``.
-        sync_bn (bool, optional): If ``True``, replace all BatchNorm layers with SyncBatchNorm layers.
-            Default: ``True``.
-        use_plus (bool, optional): If ``True``, use DeepLabv3+ head instead of DeepLabv3. Default: ``True``.
-        init_fn (Callable, optional): initialization function for the model. ``()`` for no initialization.
-            Default: ``()``.
-
-    Returns:
-        deeplabv3: A DeepLabV3 :class:`torch.nn.Module`.
-
-    Example:
-    .. code-block:: python
-        from composer.models.deeplabv3.deeplabv3 import deeplabv3
-        pytorch_model = deeplabv3(num_classes=150, backbone_arch='resnet101', backbone_weights=None)
-    """
-    # check that the specified architecture is in the resnet module
-    if not hasattr(resnet, backbone_arch):
-        raise ValueError(
-            f'backbone_arch must be part of the torchvision resnet module, got value: {backbone_arch}'
-        )
-
-    # change the model weight url if specified
-    # if version.parse(torchvision.__version__) < version.parse('0.13.0'):
-    #     pretrained = False
     if version.parse(torchvision.__version__) < version.parse('0.13.0'):
         pretrained = False
         if backbone_weights:
@@ -105,80 +75,18 @@ def deeplabv3(num_classes: int,
             replace_stride_with_dilation=[False, True, True])
 
     # specify which layers to extract activations from
-    return_layers = {
-        'layer1': 'layer1',
-        'layer4': 'layer4'
-    } 
-    backbone = _utils.IntermediateLayerGetter(backbone,
-                                              return_layers=return_layers)
+    out_inplanes = 2048
+    aux_inplanes = 1024
 
-    # try:
-    #     from mmseg.models import (  # type: ignore (reportMissingImports)
-    #         ASPPHead, DepthwiseSeparableASPPHead)
-    # except ImportError as e:
-    #     raise ImportError(
-    #         textwrap.dedent("""\
-    #         Either mmcv or mmsegmentation is not installed. To install mmcv, please run pip install mmcv-full==1.4.4 -f
-    #          https://download.openmmlab.com/mmcv/dist/{cu_version}/{torch_version}/index.html where {cu_version} and
-    #          {torch_version} refer to your CUDA and PyTorch versions, respectively. To install mmsegmentation, please
-    #          run pip install mmsegmentation==0.22.0 on command-line.""")) from e
+    return_layers = {'layer4': 'out'}
+    backbone =IntermediateLayerGetter(backbone, return_layers=return_layers)
 
-    world_size = dist.get_world_size()
-    # if sync_bn and world_size == 1:
-    #     warnings.warn(
-    #         'sync_bn was true, but only one process is present for training. sync_bn will be ignored.'
-    #     )
-
-    # norm_type = 'SyncBN' if sync_bn and world_size > 1 else 'BN'
-    # norm_cfg = {'type': norm_type, 'requires_grad': True}
-    # # if use_plus:
-    #     # mmseg config:
-    #     # https://github.com/open-mmlab/mmsegmentation/blob/master/configs/_base_/models/deeplabv3plus_r50-d8.py
-    #     head = DepthwiseSeparableASPPHead(in_channels=2048,
-    #                                       in_index=-1,
-    #                                       channels=512,
-    #                                       dilations=(1, 12, 24, 36),
-    #                                       c1_in_channels=256,
-    #                                       c1_channels=48,
-    #                                       dropout_ratio=0.1,
-    #                                       num_classes=num_classes,
-    #                                       norm_cfg=norm_cfg,
-    #                                       align_corners=False)
-    # else:
-    #     # mmseg config:
-    #     # https://github.com/open-mmlab/mmsegmentation/blob/master/configs/_base_/models/deeplabv3_r50-d8.py
-    head = DeepLabHead(in_channels=2048,
+    head = DeepLabHead(in_channels=out_inplanes,
                     num_classes=num_classes,)
 
     model = SimpleSegmentationModel(backbone, head)
 
     # Only apply initialization to classifier head if pre-trained weights are used
-    if init_fn:
-        if backbone_weights is None:
-            model.apply(init_fn)
-        else:
-            model.classifier.apply(init_fn)
-
-    if sync_bn and world_size > 1:
-        local_world_size = dist.get_local_world_size()
-
-        # List of ranks for each node, assumes that each node has the same number of ranks
-        num_nodes = world_size // local_world_size
-        process_group = None
-        if num_nodes > 1:
-            ranks_per_node = [
-                list(
-                    range(node * local_world_size,
-                          (node + 1) * local_world_size))
-                for node in range(num_nodes)
-            ]
-            process_groups = [
-                torch_dist.new_group(ranks) for ranks in ranks_per_node
-            ]
-            process_group = process_groups[dist.get_node_rank()]
-
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(
-            model, process_group=process_group)
 
     return model
 
@@ -186,11 +94,10 @@ def deeplabv3(num_classes: int,
 def build_composer_deeplabv3(num_classes: int,
                              backbone_arch: str = 'resnet50',
                              backbone_weights: Optional[str] = None,
-                             sync_bn: bool = False,
                              ignore_index: int = -1,
                              cross_entropy_weight: float = 1.0,
                              dice_weight: float = 0.0,
-                             init_fn: Optional[Callable] = None):
+                            ):
     """Create a :class:`.ComposerClassifier` for a DeepLabv3(+) model.
 
     Logs Mean Intersection over Union (MIoU) and Cross Entropy during training and validation.
@@ -223,8 +130,7 @@ def build_composer_deeplabv3(num_classes: int,
     model = deeplabv3(backbone_arch=backbone_arch,
                       backbone_weights=backbone_weights,
                       num_classes=num_classes,
-                      sync_bn=sync_bn,
-                      init_fn=init_fn)
+                    )
 
     train_metrics = MetricCollection([
         CrossEntropy(ignore_index=ignore_index),

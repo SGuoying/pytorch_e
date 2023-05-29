@@ -3,6 +3,7 @@
 
 """DeepLabV3 model extending :class:`.ComposerClassifier`."""
 
+from collections import OrderedDict
 import functools
 import textwrap
 import warnings
@@ -25,24 +26,59 @@ from sunyata.pytorch.arch.deeplabv3 import DeepLabHead, IntermediateLayerGetter
 __all__ = ['deeplabv3', 'build_composer_deeplabv3']
 
 
+# class SimpleSegmentationModel(torch.nn.Module):
+
+#     def __init__(self, backbone, classifier):
+#         super().__init__()
+#         self.backbone = backbone
+#         self.classifier = classifier
+
+#     def forward(self, x):
+#         input_shape = x.shape[-2:]
+#         features = self.backbone(x)
+#         logits = self.classifier(tuple(features.values()))
+#         logits = F.interpolate(logits,
+#                                size=input_shape,
+#                                mode='bilinear',
+#                                align_corners=False,
+#                                recompute_scale_factor=False)
+#         return logits
 class SimpleSegmentationModel(torch.nn.Module):
+    """
+    Implements DeepLabV3 model from
+    `"Rethinking Atrous Convolution for Semantic Image Segmentation"
+    <https://arxiv.org/abs/1706.05587>`_.
+
+    Args:
+        backbone (nn.Module): the network used to compute the features for the model.
+            The backbone should return an OrderedDict[Tensor], with the key being
+            "out" for the last feature map used, and "aux" if an auxiliary classifier
+            is used.
+        classifier (nn.Module): module that takes the "out" element returned from
+            the backbone and returns a dense prediction.
+        aux_classifier (nn.Module, optional): auxiliary classifier used during training
+    """
+    __constants__ = ['aux_classifier']
 
     def __init__(self, backbone, classifier):
         super().__init__()
         self.backbone = backbone
         self.classifier = classifier
 
-    def forward(self, x):
-        input_shape = x.shape[-2:]
-        features = self.backbone(x)
-        logits = self.classifier(tuple(features.values()))
-        logits = F.interpolate(logits,
-                               size=input_shape,
-                               mode='bilinear',
-                               align_corners=False,
-                               recompute_scale_factor=False)
-        return logits
 
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        input_shape = x.shape[-2:]
+        # contract: features is a dict of tensors
+        features = self.backbone(x)
+
+        result = OrderedDict()
+        x = features["out"]
+        x = self.classifier(x)
+        # 使用双线性插值还原回原图尺度
+        x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False, recompute_scale_factor=False)
+        result["out"] = x
+
+        return result
 
 def deeplabv3(num_classes: int,
               backbone_arch: str = 'resnet50',

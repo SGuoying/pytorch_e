@@ -80,26 +80,29 @@ def deeplabv3(num_classes: int,
     # change the model weight url if specified
     # if version.parse(torchvision.__version__) < version.parse('0.13.0'):
     #     pretrained = False
-    
-    if backbone_weights == 'IMAGENET1K_V1':
-        resnet.model_urls[
-            backbone_arch] = 'https://download.pytorch.org/models/resnet50-0676ba61.pth'     #'https://download.pytorch.org/models/resnet101-63fe2227.pth'
-    elif backbone_weights == 'IMAGENET1K_V2':
-        resnet.model_urls[
-            backbone_arch] = 'https://download.pytorch.org/models/resnet50-0676ba61.pth'     #'https://download.pytorch.org/models/resnet101-cd907fc2.pth'
+    if version.parse(torchvision.__version__) < version.parse('0.13.0'):
+        pretrained = False
+        if backbone_weights:
+            pretrained = True
+            if backbone_weights == 'IMAGENET1K_V1':
+                resnet.model_urls[
+                    backbone_arch] = 'https://download.pytorch.org/models/resnet101-63fe2227.pth'
+            elif backbone_weights == 'IMAGENET1K_V2':
+                resnet.model_urls[
+                    backbone_arch] = 'https://download.pytorch.org/models/resnet101-cd907fc2.pth'
+            else:
+                ValueError(
+                    textwrap.dedent(f"""\
+                        `backbone_weights` must be either "IMAGENET1K_V1" or "IMAGENET1K_V2"
+                        if torchvision.__version__ < 0.13.0. `backbone_weights` was {backbone_weights}."""
+                                   ))
+        backbone = getattr(resnet, backbone_arch)(
+            pretrained=pretrained,
+            replace_stride_with_dilation=[False, True, True])
     else:
-        ValueError(
-            textwrap.dedent(f"""\
-                `backbone_weights` must be either "IMAGENET1K_V1" or "IMAGENET1K_V2"
-                if torchvision.__version__ < 0.13.0. `backbone_weights` was {backbone_weights}."""
-                           ))
-    #     backbone = getattr(resnet, backbone_arch)(
-    #         pretrained=pretrained,
-    #         replace_stride_with_dilation=[False, True, True])
-    # else:
-    backbone = getattr(resnet, backbone_arch)(
-        weights=backbone_weights,
-        replace_stride_with_dilation=[False, True, True])
+        backbone = getattr(resnet, backbone_arch)(
+            weights=backbone_weights,
+            replace_stride_with_dilation=[False, True, True])
 
     # specify which layers to extract activations from
     return_layers = {

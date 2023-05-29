@@ -112,16 +112,16 @@ def deeplabv3(num_classes: int,
     backbone = _utils.IntermediateLayerGetter(backbone,
                                               return_layers=return_layers)
 
-    try:
-        from mmseg.models import (  # type: ignore (reportMissingImports)
-            ASPPHead, DepthwiseSeparableASPPHead)
-    except ImportError as e:
-        raise ImportError(
-            textwrap.dedent("""\
-            Either mmcv or mmsegmentation is not installed. To install mmcv, please run pip install mmcv-full==1.4.4 -f
-             https://download.openmmlab.com/mmcv/dist/{cu_version}/{torch_version}/index.html where {cu_version} and
-             {torch_version} refer to your CUDA and PyTorch versions, respectively. To install mmsegmentation, please
-             run pip install mmsegmentation==0.22.0 on command-line.""")) from e
+    # try:
+    #     from mmseg.models import (  # type: ignore (reportMissingImports)
+    #         ASPPHead, DepthwiseSeparableASPPHead)
+    # except ImportError as e:
+    #     raise ImportError(
+    #         textwrap.dedent("""\
+    #         Either mmcv or mmsegmentation is not installed. To install mmcv, please run pip install mmcv-full==1.4.4 -f
+    #          https://download.openmmlab.com/mmcv/dist/{cu_version}/{torch_version}/index.html where {cu_version} and
+    #          {torch_version} refer to your CUDA and PyTorch versions, respectively. To install mmsegmentation, please
+    #          run pip install mmsegmentation==0.22.0 on command-line.""")) from e
 
     world_size = dist.get_world_size()
     # if sync_bn and world_size == 1:

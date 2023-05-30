@@ -196,7 +196,7 @@ class BayesConvMixer(ConvMixer3):
         )
         # self.digup = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        # self.skip_connection = cfg.skip_connection
+        self.skip_connection = cfg.skip_connection
 
         # logits = torch.zeros(1, cfg.hidden_dim)
         # self.register_buffer('logits', logits)

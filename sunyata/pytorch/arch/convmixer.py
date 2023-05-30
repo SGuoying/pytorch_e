@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d, AvgAttnPooling2dS
 
 from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayer3, ecablock
-from sunyata.pytorch.arch.van import Attention
+from sunyata.pytorch.arch.van import attention
 
 
 # %%
@@ -118,7 +118,7 @@ class ConvMixer3(nn.Module):
         super().__init__()
 
         self.layers = nn.ModuleList([
-            Attention(cfg.hidden_dim)
+            attention(cfg.hidden_dim)
             for _ in range(cfg.num_layers)
         ])
 

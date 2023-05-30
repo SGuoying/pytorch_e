@@ -45,3 +45,15 @@ class Attention(nn.Module):
         x = x + shorcut
         return x
     
+
+class attention(nn.Sequential):
+    def __init__(self, hidden_dim: int):
+        super().__init__(
+            nn.Conv2d(hidden_dim, hidden_dim, 1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim, eps=7e-5),
+            LKA(hidden_dim),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim, eps=7e-5),
+            nn.Conv2d(hidden_dim, hidden_dim, 1),  
+        )   

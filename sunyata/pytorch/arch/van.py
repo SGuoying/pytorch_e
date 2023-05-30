@@ -45,5 +45,3 @@ class Attention(nn.Module):
         x = x + shorcut
         return x
     
-
-c

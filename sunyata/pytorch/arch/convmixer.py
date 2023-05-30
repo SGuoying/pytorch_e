@@ -140,7 +140,9 @@ class ConvMixer3(nn.Module):
 
     def forward(self, x):
         x = self.embed(x)
-        x = self.layers(x)
+        # x = self.layers(x)
+        for layer in self.layers:
+            x = x + layer(x)
         x = self.digup(x)
         return x
 

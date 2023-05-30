@@ -181,13 +181,9 @@ class ConvMixereca(ConvMixer):
         return x
 
 
-class BayesConvMixer(ConvMixer):
+class BayesConvMixer(ConvMixer3):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
-        self.layers = nn.Sequential(*[
-            ConvMixerLayer3(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
-        ])
 
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         if cfg.layer_norm_zero_init:
@@ -209,10 +205,10 @@ class BayesConvMixer(ConvMixer):
         x = self.embed(x)
         logits = self.digup(x)
         for layer in self.layers:
-            # if self.skip_connection:
-            #     x = x + layer(x)
-            # else:
-            x = layer(x)
+            if self.skip_connection:
+                x = x + layer(x)
+            else:
+                x = layer(x)
             logits = logits + self.digup(x)
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)

@@ -51,8 +51,10 @@ class ConvMixerattn(nn.Module):
         self.cfg = cfg
 
     def forward(self, x):
-        data = rearrange(x, 'b ... d -> b (...) d')
+        # data = rearrange(x, 'b ... d -> b (...) d')
         x = self.embed(x)
+        data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        
         logits = self.attn(x, data)
         for layer in self.layers:
             x = x + layer(x)

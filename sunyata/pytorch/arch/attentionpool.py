@@ -153,7 +153,7 @@ def default(val, d):
     return val if exists(val) else d
 
 class Attention(nn.Module):
-    def __init__(self, query_dim, context_dim = 3, heads = 8, dim_head = 32, dropout = 0.):
+    def __init__(self, query_dim, context_dim = None, heads = 8, dim_head = 32, dropout = 0.):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
@@ -169,7 +169,8 @@ class Attention(nn.Module):
         self.reduce = nn.Sequential(Reduce('b n d -> b d', 'mean'))
 
     def forward(self, x, context = None):
-        x = rearrange(x, 'b ... d -> b (...) d')
+        # x = rearrange(x, 'b ... d -> b (...) d')
+        x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads
 
         q = self.to_q(x)

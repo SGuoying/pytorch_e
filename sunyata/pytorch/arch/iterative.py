@@ -49,16 +49,15 @@ class ConvMixerattn(nn.Module):
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
-        logits = torch.zeros(1, cfg.hidden_dim)
-        self.register_buffer('logits', logits)
+        # logits = torch.zeros(1, cfg.hidden_dim)
+        # self.register_buffer('logits', logits)
 
     def forward(self, x):
-        # data = rearrange(x, 'b ... d -> b (...) d')
-        data = x.flatten(2).transpose(1, 2)
+        # data = x.flatten(2).transpose(1, 2)
         x = self.embed(x)
-        # data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         
-        logits = self.logits
+        logits = self.attn(x, data)
         for layer in self.layers:
             x = x + layer(x)
             logits = self.attn(x, data) + logits

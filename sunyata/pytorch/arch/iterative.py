@@ -54,8 +54,9 @@ class ConvMixerattn(nn.Module):
 
     def forward(self, x):
         # data = rearrange(x, 'b ... d -> b (...) d')
+        data = x.flatten(2).transpose(1, 2)
         x = self.embed(x)
-        data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        # data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         
         logits = self.logits
         for layer in self.layers:

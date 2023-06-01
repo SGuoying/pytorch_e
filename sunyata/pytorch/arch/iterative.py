@@ -44,7 +44,7 @@ class ConvMixerattn(nn.Module):
         #     nn.Flatten(),
         #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
         # )
-        self.attn = Attention(cfg.hidden_dim)
+        self.attn = Attention(cfg.hidden_dim, 3)
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 

@@ -62,7 +62,7 @@ class ConvMixerattn(nn.Module):
         # data = x.flatten(2).transpose(1, 2)
         # x = self.embed(x)
         data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
-        
+        x = self.embed(x)
         logits = self.attn(x, data)
         for layer in self.layers:
             x = x + layer(x)

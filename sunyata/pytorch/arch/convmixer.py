@@ -181,7 +181,7 @@ class ConvMixereca(ConvMixer):
         return x
 
 
-class BayesConvMixer(ConvMixer3):
+class BayesConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 

@@ -95,21 +95,17 @@ class ConvMixerattn2(nn.Module):
         #     nn.Flatten(),
         #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
         # )
-        self.attn = Attention(cfg.hidden_dim, context_dim=3)
+        self.attn = Attention(cfg.hidden_dim)
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
-        # logits = torch.zeros(1, cfg.hidden_dim)
-        # self.register_buffer('logits', logits)
 
     def forward(self, x):
         # data = rearrange(x, 'b ... d -> b (...) d')
-        data = x.flatten(2).transpose(1, 2)
         x = self.embed(x)
-        # data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         logits = self.attn(x, data)
-        # logits = self.logits
         for layer in self.layers:
             x = x + layer(x)
             logits = self.attn(x, data) + logits

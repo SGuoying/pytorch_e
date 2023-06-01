@@ -31,14 +31,20 @@ class ConvMixerattn(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
+        # self.embed = nn.Sequential(
+        #     nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
+        #               stride=cfg.patch_size),
+        #     nn.GELU(),
+        #     # eps>6.1e-5 to avoid nan in half precision
+        #     nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        # )
         self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.kernel_size, padding="same"),
             nn.GELU(),
             # eps>6.1e-5 to avoid nan in half precision
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
-
+        
         # self.digup = nn.Sequential(
         #     nn.AdaptiveAvgPool2d((1, 1)),
         #     nn.Flatten(),

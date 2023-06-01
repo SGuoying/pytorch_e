@@ -35,7 +35,7 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = ConvMixer(cfg)
     elif model_name == "bayesse_convmixer":
         model = BayesSEConvMixer2(cfg)
-    elif model_name == "bayes_convmixer3":
+    elif model_name == "bayes_convmixer":
         model = BayesConvMixer(cfg)
     elif model_name == "crossattn":
         model = ConvMixerattn(cfg)

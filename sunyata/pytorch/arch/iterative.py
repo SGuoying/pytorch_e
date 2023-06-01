@@ -39,23 +39,25 @@ class ConvMixerattn(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
 
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1, 1)),
+        #     nn.Flatten(),
+        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        # )
         self.attn = Attention(cfg.hidden_dim)
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
+        logits = torch.zeros(1, cfg.hidden_dim)
+        self.register_buffer('logits', logits)
 
     def forward(self, x):
         # data = rearrange(x, 'b ... d -> b (...) d')
         x = self.embed(x)
         data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         
-        logits = self.attn(x, data)
+        logits = self.logits
         for layer in self.layers:
             x = x + layer(x)
             logits = self.attn(x, data) + logits

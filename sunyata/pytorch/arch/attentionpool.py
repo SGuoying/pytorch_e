@@ -167,7 +167,6 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim)
 
-
     def forward(self, x, context = None):
         # x: [B, C, H, W]
         x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
@@ -191,4 +190,4 @@ class Attention(nn.Module):
         B, HW, C = out.size()
         h = int(HW ** 0.5)
         out = out.transpose(1, 2).view(B, C, h, h)
-        return 
+        return out

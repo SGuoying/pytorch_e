@@ -152,3 +152,5 @@ class ConvMixerattn3(nn.Module):
             x = self.attn(x, data) + x
         x = self.digup(x)
         return x
+    
+

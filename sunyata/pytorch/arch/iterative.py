@@ -153,9 +153,9 @@ class ConvMixerattn3(nn.Module):
             self_conv = nn.ModuleList([])
 
             for key in range(self_per_cross_conv):
-                self_conv.append(nn.ModuleList([
+                self_conv.append(
                     conv(**cache_args, key=key)
-                ]))
+                )
             self.layer.append(nn.ModuleList([
                 self_conv,
                 attn(**cache_args)

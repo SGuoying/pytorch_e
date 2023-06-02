@@ -166,10 +166,10 @@ class Attention(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim)
-        self.reduce = nn.Sequential(Reduce('b n d -> b d', 'mean'))
+
 
     def forward(self, x, context = None):
-        # x = rearrange(x, 'b ... d -> b (...) d')
+        # x: [B, C, H, W]
         x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads
 
@@ -188,4 +188,7 @@ class Attention(nn.Module):
         out = einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
         out = self.to_out(out)
-        return self.reduce(out)
+        B, HW, C = out.size()
+        h = int(HW ** 0.5)
+        out = out.transpose(1, 2).view(B, C, h, h)
+        return 

@@ -318,7 +318,7 @@ class ConvMixerCat(nn.Module):
             logits = self.digup(x) + logits
             logits = self.layer_norm(logits)
             logits_list.append(logits)
-        logits = torch.cat(logits_list, dim=1)
+        logits = torch.cat(logits_list, dim=-1)
         logits = self.attn(logits, data)
         logits = self.fc(logits)
         return logits

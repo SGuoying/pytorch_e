@@ -3,10 +3,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sunyata.pytorch.arch.attentionpool import AvgAttnPooling2d, AvgAttnPooling2dS
 
-from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ConvMixerLayer3, ecablock
-from sunyata.pytorch.arch.van import attention
+from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ecablock
 
 
 # %%
@@ -294,6 +292,7 @@ class ConvMixerCat(nn.Module):
         self.digup = nn.Sequential(
             # nn.AdaptiveAvgPool2d((1, 1)),
             ecablock(cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
             # Rearrange('b c h w -> b c (h w)'),
             # nn.Flatten(),
             # nn.Linear(cfg.hidden_dim, cfg.num_classes)
@@ -320,7 +319,7 @@ class ConvMixerCat(nn.Module):
             logits = self.digup(x) + logits
             logits = self.norm(logits)
             logits_list.append(logits)
-        logits = torch.cat(logits_list, dim=-1)
+        logits = torch.cat(logits_list, dim=1)
         logits = self.norm(self.attn(logits, data))
         logits = self.fc(logits)
         return logits

@@ -71,10 +71,7 @@ class Attention(nn.Module):
 
         out = einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
-        out = self.to_out(out)
-        # B, HW, C = out.size()
-        # h = int(HW ** 0.5)
-        # out = out.transpose(1, 2).view(B, C, h, h)
+        out = self.to_out(out)  # [B, HW, C]
         return out
 
 
@@ -279,7 +276,7 @@ from einops.layers.torch import Rearrange, Reduce
 
 class ConvMixerCat(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
+        super().__init__(cfg)
 
         self.layers = nn.ModuleList([
             ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
@@ -300,7 +297,7 @@ class ConvMixerCat(nn.Module):
             nn.Flatten(),
             # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
-        self.attn = Attention(cfg.hidden_dim*cfg.num_layers),
+        self.attn = Attention(cfg.hidden_dim*cfg.num_layers)
             
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Sequential(
@@ -324,5 +321,4 @@ class ConvMixerCat(nn.Module):
         logits = torch.cat(logits_list, dim=1)
         logits = self.attn(logits, data)
         logits = self.fc(logits)
-        # x = self.digup(x)
         return logits

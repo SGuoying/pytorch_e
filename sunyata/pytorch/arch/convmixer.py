@@ -146,6 +146,10 @@ class ConvMixer2(nn.Module):
         )
 
         self.digup = nn.Sequential(
+            ecablock(cfg.hidden_dim, cfg.eca_kernel_size),
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        )
+        self.fc = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
@@ -155,8 +159,12 @@ class ConvMixer2(nn.Module):
 
     def forward(self, x):
         x = self.embed(x)
-        x = self.layers(x)
-        x = self.digup(x)
+        logits = self.digup(x)
+        for layer1 in self.layer1:
+            x = x + layer1(x)
+            logits = logits + self.digup(x)
+        for layer2 in self.layer2:
+        x = self.fc(logits)
         return x
   
 class ConvMixereca(ConvMixer):
@@ -305,7 +313,7 @@ class ConvMixerCat(nn.Module):
         # self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Sequential(
             Reduce('b n d -> b d', 'mean'),
-            nn.LayerNorm(cfg.hidden_dim),
+            nn.LayerNorm(dim),
             nn.Linear(dim, cfg.num_classes)
         )
 

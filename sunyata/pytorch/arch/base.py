@@ -115,7 +115,7 @@ class ecablock(nn.Module):
         # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
         y = self.conv(y.squeeze(-1).transpose(-1, -2))
         # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
-        #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
+        # unsqueeze：(batch_size, channels, 1)变为(batch_size, channels, 1, 1)
         y = y.transpose(-1, -2).unsqueeze(-1)
         y = self.sigmoid(y)
         return x * y.expand_as(x)

@@ -298,7 +298,7 @@ class ConvMixerCat(nn.Module):
             # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         dim = cfg.hidden_dim * cfg.num_layers
-        self.attn = Attention(dim)
+        self.attn = Attention(dim, cfg.hidden_dim)
             
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Sequential(

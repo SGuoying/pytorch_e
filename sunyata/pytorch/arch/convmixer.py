@@ -276,7 +276,7 @@ from einops.layers.torch import Rearrange, Reduce
 
 class ConvMixerCat(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
+        super().__init__()
 
         self.layers = nn.ModuleList([
             ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)

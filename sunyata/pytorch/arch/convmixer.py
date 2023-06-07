@@ -293,9 +293,7 @@ class ConvMixerCat(nn.Module):
             # nn.AdaptiveAvgPool2d((1, 1)),
             ecablock(cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
-            # Rearrange('b c h w -> b c (h w)'),
             # nn.Flatten(),
-            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         dim = cfg.hidden_dim * cfg.num_layers
         self.attn = Attention(dim, cfg.hidden_dim)
@@ -317,7 +315,7 @@ class ConvMixerCat(nn.Module):
         for layer in self.layers:
             x = layer(x) + x
             logits = self.digup(x) + logits
-            logits = self.norm(logits)
+            # logits = self.norm(logits)
             logits_list.append(logits)
         logits = torch.cat(logits_list, dim=1)
         logits = self.norm(self.attn(logits, data))

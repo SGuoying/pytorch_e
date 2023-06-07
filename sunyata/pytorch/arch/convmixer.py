@@ -303,7 +303,7 @@ class ConvMixerCat(nn.Module):
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Sequential(
             Reduce('b n d -> b d', 'mean'),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes),
+            nn.Linear(dim, cfg.num_classes)
         )
 
         self.cfg = cfg

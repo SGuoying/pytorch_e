@@ -21,13 +21,12 @@ class eca_layer(nn.Module):
         # assert x.ndim == 4
         #  (batch_size, channels, 1, 1)
         # y = self.avg_pool(x)
-        y = torch.unsqueeze(x, 2)
+        y = self.conv(y.unsqueeze(-1).transpose(-1,-2))
         # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
         # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
-        y = self.conv(y.transpose(-1, -2))
+        y = y.transpose(-1,-2).squeeze(-1)
         # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
         #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
-        y = y.transpose(-1, -2).squeeze(-1)
         return y
 
 
@@ -113,39 +112,6 @@ class ConvMixer2(nn.Module):
         x = self.digup(x)
         return x
   
-class ConvMixer3(nn.Module):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
-
-        self.layers = nn.ModuleList([
-            attention(cfg.hidden_dim)
-            for _ in range(cfg.num_layers)
-        ])
-
-        self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
-            nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
-        )
-
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
-
-        self.cfg = cfg
-
-    def forward(self, x):
-        x = self.embed(x)
-        # x = self.layers(x)
-        for layer in self.layers:
-            x = x + layer(x)
-        x = self.digup(x)
-        return x
-
 class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -153,7 +119,6 @@ class ConvMixereca(ConvMixer):
             ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
-        self.eca = ecablock(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
 
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
@@ -162,23 +127,29 @@ class ConvMixereca(ConvMixer):
             # eps>6.1e-5 to avoid nan in half precision
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
+        self.ecalayer = nn.Sequential(
+            eca_layer(cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
+            nn.LayerNorm(cfg.hidden_dim),
+            )
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            # eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+
+        self.cfg = cfg
 
     def forward(self, x):
         x = self.embed(x)
-        # x = self.layers(x)
+        logits = self.digup(x)
         for layer in self.layers:
-            x1 = layer(x)
-            x = self.eca(x1) + x
-            # x = x + layer(x)
-        x = self.digup(x)
-        return x
+            x = x + layer(x)
+            logits = self.digup(x) + logits
+            logits = self.ecalayer(logits)
+        logits = self.fc(logits)
+        return logits
 
 
 class BayesConvMixer(ConvMixer):

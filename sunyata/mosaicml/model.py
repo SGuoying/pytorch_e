@@ -6,8 +6,7 @@ from composer.models import ComposerClassifier
 from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
 
-from sunyata.pytorch.arch.convmixer import ConvMixerCfg, ConvMixer, BayesConvMixer, ConvMixereca
-from sunyata.pytorch.arch.iterative import ConvMixerattn, ConvMixerattn2, ConvMixerattn3
+from sunyata.pytorch.arch.convmixer import ConvMixerCat, ConvMixerCfg, ConvMixer, BayesConvMixer, ConvMixereca
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
                              num_layers: int = 8,
@@ -37,12 +36,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = ConvMixereca(cfg)
     elif model_name == "bayes_convmixer":
         model = BayesConvMixer(cfg)
-    elif model_name == "crossattn":
-        model = ConvMixerattn(cfg)
-    elif model_name == "crossattn2":
-        model = ConvMixerattn2(cfg)
-    elif model_name == "crossattn3":
-        model = ConvMixerattn3(cfg)
+    elif model_name == "convmixerCat":
+        model = ConvMixerCat(cfg)
 
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

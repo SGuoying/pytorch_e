@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from einops import rearrange
+from einops.layers.torch import Rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -90,26 +91,33 @@ class ConvMixerattn2(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
 
-        # self.digup = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d((1, 1)),
-        #     nn.Flatten(),
-        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        # )
-        self.attn = Attention(cfg.hidden_dim)
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            Rearrange('b c h w -> b c (h w)'),
+            nn.LayerNorm(cfg.hidden_dim)
+            # nn.Flatten(),
+            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+        self.attn = nn.Sequential(
+            Attention(cfg.hidden_dim),
+            
+            )
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
 
     def forward(self, x):
-        # data = rearrange(x, 'b ... d -> b (...) d')
+        logits_list = []
+
         x = self.embed(x)
-        data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
-        logits = self.attn(x, data)
+        data = x.flatten(2).transpose(1, 2)  # data:init   [B, HW, C]  
+        logits = self.digup(x)
         for layer in self.layers:
-            x = x + layer(x)
-            logits = self.attn(x, data) + logits
-            logits = self.layer_norm(logits)
+            x = layer(x) + x
+            logits = self.digup(x) + logits
+            logits_list.append(logits)
+        logits = torch.cat(logits_list, dim=1)
         logits = self.fc(logits)
         # x = self.digup(x)
         return logits

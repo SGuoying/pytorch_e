@@ -29,6 +29,54 @@ class eca_layer(nn.Module):
         #  squeeze：(batch_size, channels, 1)变为(batch_size, channels)
         return y
 
+from torch import einsum
+from einops import rearrange
+def exists(val):
+    return val is not None
+
+def default(val, d):
+    return val if exists(val) else d
+
+class Attention(nn.Module):
+    def __init__(self, query_dim, context_dim = None, heads = 8, dim_head = 32, dropout = 0.):
+        super().__init__()
+        inner_dim = dim_head * heads
+        context_dim = default(context_dim, query_dim)
+
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+
+        self.to_q = nn.Linear(query_dim, inner_dim, bias = False)
+        self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias = False)
+
+        self.dropout = nn.Dropout(dropout)
+        self.to_out = nn.Linear(inner_dim, query_dim)
+
+    def forward(self, x, context = None):
+        # x: [B, C]
+        x = x.unsqueeze(-1).transpose(1, 2)  # [B, HW, C]
+        h = self.heads
+
+        q = self.to_q(x)
+        context = default(context, x)
+        k, v = self.to_kv(context).chunk(2, dim = -1)
+
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h = h), (q, k, v))
+
+        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+
+        # attention, what we cannot get enough of
+        attn = sim.softmax(dim = -1)
+        attn = self.dropout(attn)
+
+        out = einsum('b i j, b j d -> b i d', attn, v)
+        out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
+        out = self.to_out(out)
+        # B, HW, C = out.size()
+        # h = int(HW ** 0.5)
+        # out = out.transpose(1, 2).view(B, C, h, h)
+        return out
+
 
 @dataclass
 class ConvMixerCfg(BaseCfg):
@@ -227,71 +275,54 @@ class CombineConvMixer(ConvMixer):
         return logits
 
 
-class BayesConvMixereca(ConvMixer):
+from einops.layers.torch import Rearrange, Reduce
+
+class ConvMixerCat(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
+        super().__init__()
 
-        # self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        self.logits_layer_norm = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
-        if cfg.layer_norm_zero_init:
-            self.logits_layer_norm.weight.data = torch.zeros(
-                self.logits_layer_norm.weight.data.shape)
-
-        # self.digup = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
-        )
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.skip_connection = cfg.skip_connection
-
-    def forward(self, x):
-        x = self.embed(x)
-        logits = self.digup(x)
-        # logits = self.logits
-        for layer in self.layers:
-            if self.skip_connection:
-                x = x + layer(x)
-            else:
-                x = layer(x)
-            logits = logits + self.digup(x)
-            logits = self.logits_layer_norm(logits)
-        logits = self.fc(logits)
-        return logits
-
-
-class BayesSEConvMixer2(ConvMixer):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
-        self.layers = nn.Sequential(*[
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        self.layers = nn.ModuleList([
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
-        # self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        self.logits_layer_norm = SE(hidden_dim=cfg.hidden_dim)
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
+                      stride=cfg.patch_size),
+            nn.GELU(),
+            # eps>6.1e-5 to avoid nan in half precision
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        )
 
         self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1,1)),
-            # nn.Flatten(),
-        )
-        self.fc = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            # Rearrange('b c h w -> b c (h w)'),
             nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-            )
-        # self.skip_connection = cfg.skip_connection
+            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+        self.attn = Attention(cfg.hidden_dim*cfg.num_layers),
+            
+        self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.fc = nn.Sequential(
+            Reduce('b n d -> b d', 'mean'),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes),
+        )
 
-        # logits = torch.zeros(1, cfg.hidden_dim)
-        # self.register_buffer('logits', logits)
+        self.cfg = cfg
 
     def forward(self, x):
+        logits_list = []
+
         x = self.embed(x)
+        data = x.flatten(2).transpose(1, 2)  # data:init   [B, HW, C]  
         logits = self.digup(x)
-        # logits = self.logits
         for layer in self.layers:
-            # x = x + layer(x)
-            x = layer(x)
-            logits = logits + self.digup(x)
-            logits = self.logits_layer_norm(logits)
+            x = layer(x) + x
+            logits = self.digup(x) + logits
+            logits = self.layer_norm(logits)
+            logits_list.append(logits)
+        logits = torch.cat(logits_list, dim=1)
+        logits = self.attn(logits, data)
         logits = self.fc(logits)
+        # x = self.digup(x)
         return logits

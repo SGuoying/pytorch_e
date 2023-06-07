@@ -53,8 +53,8 @@ class Attention(nn.Module):
         self.to_out = nn.Linear(inner_dim, query_dim)
 
     def forward(self, x, context = None):
-        # x: [B, C]
-        x = x.unsqueeze(-1).transpose(1, 2)  # [B, HW, C]
+        # x: [B, C, h, w]
+        x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads
 
         q = self.to_q(x)
@@ -292,15 +292,16 @@ class ConvMixerCat(nn.Module):
         )
 
         self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
+            # nn.AdaptiveAvgPool2d((1, 1)),
+            ecablock(cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
             # Rearrange('b c h w -> b c (h w)'),
-            nn.Flatten(),
+            # nn.Flatten(),
             # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         dim = cfg.hidden_dim * cfg.num_layers
         self.attn = Attention(dim, cfg.hidden_dim)
             
-        self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Sequential(
             Reduce('b n d -> b d', 'mean'),
             nn.Linear(dim, cfg.num_classes)
@@ -317,9 +318,9 @@ class ConvMixerCat(nn.Module):
         for layer in self.layers:
             x = layer(x) + x
             logits = self.digup(x) + logits
-            logits = self.layer_norm(logits)
+            logits = self.norm(logits)
             logits_list.append(logits)
         logits = torch.cat(logits_list, dim=-1)
-        logits = self.attn(logits, data)
+        logits = self.norm(self.attn(logits, data))
         logits = self.fc(logits)
         return logits

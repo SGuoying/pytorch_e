@@ -30,42 +30,6 @@ class AttentionPool2d(nn.Module):
         x = (attn @ v).transpose(1, 2).reshape(B, C)
         return self.proj(x)
     
-class AvgAttnPooling2d(nn.Module):
-    def __init__(self,
-        dim:int,
-        attn_bias:bool=True,
-        # ffn_expand:int|float=3,
-        ffn_expand:int=3,
-        norm:Callable[[int], nn.Module]=nn.LayerNorm,
-        act_cls:Callable[[None], nn.Module]=nn.GELU,
-    ):
-        super().__init__()
-        self.cls_q = nn.Parameter(torch.zeros([1,dim]))
-        self.attn = AttentionPool2d(dim, attn_bias, norm)
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.norm = norm(dim)
-        self.ffn = nn.Sequential(
-            nn.Linear(dim, int(dim*ffn_expand)),
-            act_cls(),
-            norm(int(dim*ffn_expand)),
-            nn.Linear(int(dim*ffn_expand), dim)
-        )
-        nn.init.trunc_normal_(self.cls_q, std=0.02)
-        self.apply(self._init_weights)
-
-    def forward(self, x):
-        x = self.norm(self.pool(x).flatten(1) + self.attn(x, self.cls_q))
-        x =  x + self.ffn(x)
-        x_reshaped = torch.unsqueeze(x, 2)
-        x_reshaped = torch.unsqueeze(x_reshaped, 3)
-        return x_reshaped
-
-    @torch.no_grad()
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            nn.init.trunc_normal_(m.weight, std=0.02)
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
 
 class AvgAttnPooling2dS(nn.Module):
     def __init__(self,

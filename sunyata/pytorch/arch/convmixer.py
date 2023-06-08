@@ -128,7 +128,7 @@ class ConvMixer2(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
 
-        self.layer2 = ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate),
+        self.layer2 = ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
         
 
         self.layer1 = nn.ModuleList([

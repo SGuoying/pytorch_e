@@ -28,7 +28,7 @@ class eca_layer(nn.Module):
         return y
 
 from torch import einsum
-from einops import rearrange
+from einops import rearrange, repeat
 def exists(val):
     return val is not None
 
@@ -52,7 +52,7 @@ class Attention(nn.Module):
 
     def forward(self, x, context = None):
         # x: [B, C, h, w]
-        x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        # x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads
 
         q = self.to_q(x)
@@ -333,4 +333,50 @@ class ConvMixerCat(nn.Module):
         logits = torch.cat(logits_list, dim=1)
         logits = self.attn(logits, data)
         logits = self.fc(logits)
+        return logits
+    
+
+class BayesConvMixer3(ConvMixer):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+        
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+        self.digup = Attention(query_dim=cfg.hidden_dim,
+                      context_dim=cfg.hidden_dim,
+                      heads=1, 
+                      dim_head=cfg.hidden_dim
+                      )
+        
+        # self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.skip_connection = cfg.skip_connection
+
+    def forward(self, x):
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
+
+        x = self.embed(x)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = latent + self.digup(latent, input)
+        latent = self.logits_layer_norm(latent)
+
+        for layer in self.layers:
+            if self.skip_connection:
+                x = x + layer(x)
+            else:
+                x = layer(x)
+            
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = latent + self.digup(latent, input)
+            latent = self.logits_layer_norm(latent)
+
+        latent = nn.Flatten()(latent)
+        logits = self.fc(latent)
         return logits

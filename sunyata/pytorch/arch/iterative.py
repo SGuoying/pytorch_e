@@ -205,7 +205,7 @@ class ConvMixerattn3(nn.Module):
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = self.attn(latent, input) + latent
             latent = self.layer_norm(latent)
-            x = rearrange(latent, 'b (...) d -> b ... d', h = x.shape[2], w = x.shape[3])
+            x = rearrange(latent, 'b n d -> b h w d', h = x.shape[2], w = x.shape[3])
             x = x.permute(0, 3, 1, 2)
         # for self_conv, attn in self.layer:
         #     for conv in self_conv:

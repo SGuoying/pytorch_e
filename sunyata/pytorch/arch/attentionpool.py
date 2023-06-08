@@ -133,7 +133,7 @@ class Attention(nn.Module):
 
     def forward(self, x, context = None):
         # x: [B, C, H, W]
-        x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        # x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads
 
         q = self.to_q(x)

@@ -182,7 +182,10 @@ class ConvMixerattn3(nn.Module):
             nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
-        self.attn = Attention(cfg.hidden_dim)
+        self.attn = Attention(query_dim=cfg.hidden_dim,
+                              context_dim=cfg.hidden_dim,
+                              heads=1,
+                              dim_head=cfg.hidden_dim)
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
@@ -205,7 +208,7 @@ class ConvMixerattn3(nn.Module):
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = self.attn(latent, input) + latent
             latent = self.layer_norm(latent)
-            x = rearrange(latent, 'b n d -> b h w d', h = x.shape[2], w = x.shape[3])
+            x = repeat(latent, 'b n d -> b h w d', h = x.shape[2], w = x.shape[3])
             x = x.permute(0, 3, 1, 2)
         # for self_conv, attn in self.layer:
         #     for conv in self_conv:

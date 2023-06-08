@@ -128,7 +128,7 @@ class ConvMixer2(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
 
-        self.layer2 = nn.Sequential(*[
+        self.layer2 = nn.ModuleList([
             ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
@@ -163,7 +163,8 @@ class ConvMixer2(nn.Module):
         for layer1 in self.layer1:
             x = x + layer1(x)
             logits = logits + self.digup(x)
-        for layer2 in self.layer2:
+            for layer2 in self.layer2:
+                logits = layer2(logits) + logits
         x = self.fc(logits)
         return x
   

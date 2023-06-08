@@ -337,7 +337,6 @@ class ConvMixerCat(nn.Module):
         logits = self.fc(logits)
         return logits
     
-
 class BayesConvMixer3(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)

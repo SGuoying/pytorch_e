@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from einops import rearrange
+from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 import torch
 import torch.nn as nn
@@ -141,35 +141,33 @@ def cache_fn(f):
 class ConvMixerattn3(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
-        weight_tie_layers = False
-        self_per_cross_conv = 1
+        # weight_tie_layers = False
+        # self_per_cross_conv = 1
 
-        # self.layers = nn.ModuleList([
-        #     ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-        #     for _ in range(cfg.num_layers)
-        # ])
+        self.layers = nn.ModuleList([
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
 
-        conv = lambda: ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-        attn = lambda: Attention(cfg.hidden_dim)
-        conv, attn = map(cache_fn, (conv, attn))
+        # conv = lambda: ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        # attn = lambda: Attention(cfg.hidden_dim)
+        # conv, attn = map(cache_fn, (conv, attn))
 
-        self.layer = nn.ModuleList([])
-        for i in range(cfg.num_layers):
-            should_cache = i > 0 and weight_tie_layers
-            cache_args = {'_cache': should_cache}
+        # self.layer = nn.ModuleList([])
+        # for i in range(cfg.num_layers):
+        #     should_cache = i > 0 and weight_tie_layers
+        #     cache_args = {'_cache': should_cache}
 
-            self_conv = nn.ModuleList([])
+        #     self_conv = nn.ModuleList([])
 
-            for key in range(self_per_cross_conv):
-                self_conv.append(
-                    conv(**cache_args, key=key)
-                )
-            self.layer.append(nn.ModuleList([
-                self_conv,
-                attn(**cache_args)
-            ]))
-
-
+        #     for key in range(self_per_cross_conv):
+        #         self_conv.append(
+        #             conv(**cache_args, key=key)
+        #         )
+        #     self.layer.append(nn.ModuleList([
+        #         self_conv,
+        #         attn(**cache_args)
+        #     ]))
 
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
@@ -184,23 +182,35 @@ class ConvMixerattn3(nn.Module):
             nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
-        # self.attn = Attention(cfg.hidden_dim)
-        # self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.attn = Attention(cfg.hidden_dim)
+        self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
     def forward(self, x):
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
         # data = rearrange(x, 'b ... d -> b (...) d')
         x = self.embed(x)
-        data = x.flatten(2).transpose(1, 2)  # [B, HW, C]
-        # for layer in self.layers:
-        #     x = layer(x) + x
-        #     x = self.attn(x, data) + x
-        for self_conv, attn in self.layer:
-            for conv in self_conv:
-                x = conv(x) + x
-            x = attn(x, data) + x
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = self.attn(latent, input)
+        latent = self.layer_norm(latent)
+
+        for layer in self.layers:
+            x = layer(x) + x
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = self.attn(latent, input) + latent
+            latent = self.layer_norm(latent)
+            x = rearrange(latent, 'b (...) d -> b ... d', h = x.shape[2], w = x.shape[3])
+            x = x.permute(0, 3, 1, 2)
+        # for self_conv, attn in self.layer:
+        #     for conv in self_conv:
+        #         x = conv(x) + x
+        #     x = attn(x, data) + x
         x = self.digup(x)
         return x
     

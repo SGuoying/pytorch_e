@@ -128,10 +128,10 @@ class ConvMixer2(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
 
-        self.layer2 = nn.ModuleList([
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
-        ])
+        self.layer2 = nn.Sequential(
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate),
+        )
+
         self.layer1 = nn.ModuleList([
             ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
@@ -163,8 +163,7 @@ class ConvMixer2(nn.Module):
         for layer1 in self.layer1:
             x = x + layer1(x)
             logits = logits + self.digup(x)
-            for layer2 in self.layer2:
-                logits = layer2(logits) + logits
+            logits = self.layer2(logits)
         x = self.fc(logits)
         return x
   
@@ -308,7 +307,7 @@ class ConvMixerCat(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
             # nn.Flatten(),
         )
-        dim = cfg.hidden_dim # * cfg.num_layers
+        dim = cfg.hidden_dim * cfg.num_layers
         self.attn = Attention(dim, cfg.hidden_dim)
             
         # self.norm = nn.LayerNorm(cfg.hidden_dim)
@@ -331,7 +330,7 @@ class ConvMixerCat(nn.Module):
             logits = self.digup(x) + logits
             # logits = self.norm(logits)
             logits_list.append(logits)
-        logits = torch.cat(logits_list, dim=0)
+        logits = torch.cat(logits_list, dim=1)
         logits = self.attn(logits, data)
         logits = self.fc(logits)
         return logits

@@ -308,7 +308,7 @@ class ConvMixerCat(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
             # nn.Flatten(),
         )
-        dim = cfg.hidden_dim * cfg.num_layers
+        dim = cfg.hidden_dim # * cfg.num_layers
         self.attn = Attention(dim, cfg.hidden_dim)
             
         # self.norm = nn.LayerNorm(cfg.hidden_dim)
@@ -331,7 +331,7 @@ class ConvMixerCat(nn.Module):
             logits = self.digup(x) + logits
             # logits = self.norm(logits)
             logits_list.append(logits)
-        logits = torch.cat(logits_list, dim=1)
+        logits = torch.cat(logits_list, dim=0)
         logits = self.attn(logits, data)
         logits = self.fc(logits)
         return logits

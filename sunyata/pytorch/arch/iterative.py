@@ -190,7 +190,7 @@ class ConvMixerattn3(nn.Module):
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
-        self.latent = nn.Parameter(torch.randn(1024, cfg.hidden_dim))
+        self.latent = nn.Parameter(torch.randn(256, cfg.hidden_dim))
 
     def forward(self, x):
         batch_size, _, _, _ = x.shape

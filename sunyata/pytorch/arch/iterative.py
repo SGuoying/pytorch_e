@@ -181,8 +181,8 @@ class ConvMixerattn3(nn.Module):
         )
 
         self.digup = nn.Sequential(
-            # nn.AdaptiveAvgPool2d((1, 1)),
-            # nn.Flatten(),
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         self.attn = Attention(query_dim=cfg.hidden_dim,

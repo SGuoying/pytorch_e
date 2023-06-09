@@ -141,33 +141,36 @@ def cache_fn(f):
 class ConvMixerattn3(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
-        # weight_tie_layers = False
-        # self_per_cross_conv = 1
+        weight_tie_layers = False
+        self_per_cross_conv = 1
 
-        self.layers = nn.ModuleList([
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
-        ])
+        # self.layers = nn.ModuleList([
+        #     ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        #     for _ in range(cfg.num_layers)
+        # ])
 
-        # conv = lambda: ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-        # attn = lambda: Attention(cfg.hidden_dim)
-        # conv, attn = map(cache_fn, (conv, attn))
+        conv = lambda: ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        attn = lambda: Attention(query_dim=cfg.hidden_dim,
+                              context_dim=cfg.hidden_dim,
+                              heads=1,
+                              dim_head=cfg.hidden_dim)
+        conv, attn = map(cache_fn, (conv, attn))
 
-        # self.layer = nn.ModuleList([])
-        # for i in range(cfg.num_layers):
-        #     should_cache = i > 0 and weight_tie_layers
-        #     cache_args = {'_cache': should_cache}
+        self.layer = nn.ModuleList([])
+        for i in range(cfg.num_layers):
+            should_cache = i > 0 and weight_tie_layers
+            cache_args = {'_cache': should_cache}
 
-        #     self_conv = nn.ModuleList([])
+            self_conv = nn.ModuleList([])
 
-        #     for key in range(self_per_cross_conv):
-        #         self_conv.append(
-        #             conv(**cache_args, key=key)
-        #         )
-        #     self.layer.append(nn.ModuleList([
-        #         self_conv,
-        #         attn(**cache_args)
-        #     ]))
+            for key in range(self_per_cross_conv):
+                self_conv.append(
+                    conv(**cache_args, key=key)
+                )
+            self.layer.append(nn.ModuleList([
+                self_conv,
+                attn(**cache_args)
+            ]))
 
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
@@ -178,8 +181,8 @@ class ConvMixerattn3(nn.Module):
         )
 
         self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
+            # nn.AdaptiveAvgPool2d((1, 1)),
+            # nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         self.attn = Attention(query_dim=cfg.hidden_dim,
@@ -202,21 +205,14 @@ class ConvMixerattn3(nn.Module):
         latent = self.attn(latent, input)
         latent = self.layer_norm(latent)
 
-        for layer in self.layers:
-            x = layer(x) + x
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            latent = self.attn(latent, input) + latent
+        for self_conv, attn in self.layer:
+            for conv in self_conv:
+                x = conv(x) + x
+            x = attn(latent, x) + x
+            latent = x.permute(0, 2, 3, 1)
+            latent = rearrange(latent, 'b ... d -> b (...) d')
             latent = self.layer_norm(latent)
-            B, HW, C = latent.size()
-            h = int(HW ** 0.5)
-            x = rearrange(latent, 'b (h w) d -> b h w d', h = h, w = h)
-            x = x.permute(0, 3, 1, 2)
-        # for self_conv, attn in self.layer:
-        #     for conv in self_conv:
-        #         x = conv(x) + x
-        #     x = attn(x, data) + x
-        x = self.digup(x)
+        x = self.digup(latent)
         return x
     
 

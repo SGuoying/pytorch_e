@@ -133,7 +133,7 @@ class Attention(nn.Module):
 
     def forward(self, x, context = None):
         # x: [B, C, H, W]
-        # x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+        context = context.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads
 
         q = self.to_q(x)
@@ -151,7 +151,7 @@ class Attention(nn.Module):
         out = einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
         out = self.to_out(out)
-        # B, HW, C = out.size()
-        # h = int(HW ** 0.5)
-        # out = out.transpose(1, 2).view(B, C, h, h)
+        B, HW, C = out.size()
+        h = int(HW ** 0.5)
+        out = out.transpose(1, 2).view(B, C, h, h)
         return out

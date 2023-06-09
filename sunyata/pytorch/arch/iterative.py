@@ -189,7 +189,7 @@ class ConvMixerattn3(nn.Module):
                               context_dim=cfg.hidden_dim,
                               heads=1,
                               dim_head=cfg.hidden_dim)
-        self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        # self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
@@ -200,10 +200,10 @@ class ConvMixerattn3(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
         # data = rearrange(x, 'b ... d -> b (...) d')
         x = self.embed(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = self.attn(latent, input)
-        latent = self.layer_norm(latent)
+        # input = x.permute(0, 2, 3, 1)
+        # input = rearrange(input, 'b ... d -> b (...) d')
+        latent = self.attn(latent, x)
+        # latent = self.layer_norm(latent)
 
         for self_conv, attn in self.layer:
             for conv in self_conv:
@@ -211,7 +211,7 @@ class ConvMixerattn3(nn.Module):
             x = attn(latent, x) + x
             latent = x.permute(0, 2, 3, 1)
             latent = rearrange(latent, 'b ... d -> b (...) d')
-            latent = self.layer_norm(latent)
+            # latent = self.layer_norm(latent)
         x = self.digup(latent)
         return x
     

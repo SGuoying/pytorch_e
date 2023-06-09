@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, ecablock
+from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, ecablock
+from sunyata.pytorch.layer.attention import Attention, AttentionWithoutParams, EfficientChannelAttention
 
 
 # %%
@@ -35,42 +36,42 @@ def exists(val):
 def default(val, d):
     return val if exists(val) else d
 
-class Attention(nn.Module):
-    def __init__(self, query_dim, context_dim = None, heads = 8, dim_head = 32, dropout = 0.):
-        super().__init__()
-        inner_dim = dim_head * heads
-        context_dim = default(context_dim, query_dim)
+# class Attention(nn.Module):
+#     def __init__(self, query_dim, context_dim = None, heads = 8, dim_head = 32, dropout = 0.):
+#         super().__init__()
+#         inner_dim = dim_head * heads
+#         context_dim = default(context_dim, query_dim)
 
-        self.scale = dim_head ** -0.5
-        self.heads = heads
+#         self.scale = dim_head ** -0.5
+#         self.heads = heads
 
-        self.to_q = nn.Linear(query_dim, inner_dim, bias = False)
-        self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias = False)
+#         self.to_q = nn.Linear(query_dim, inner_dim, bias = False)
+#         self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias = False)
 
-        self.dropout = nn.Dropout(dropout)
-        self.to_out = nn.Linear(inner_dim, query_dim)
+#         self.dropout = nn.Dropout(dropout)
+#         self.to_out = nn.Linear(inner_dim, query_dim)
 
-    def forward(self, x, context = None):
-        # x: [B, C, h, w]
-        # x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
-        h = self.heads
+#     def forward(self, x, context = None):
+#         # x: [B, C, h, w]
+#         # x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
+#         h = self.heads
 
-        q = self.to_q(x)
-        context = default(context, x)
-        k, v = self.to_kv(context).chunk(2, dim = -1)
+#         q = self.to_q(x)
+#         context = default(context, x)
+#         k, v = self.to_kv(context).chunk(2, dim = -1)
 
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h = h), (q, k, v))
+#         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h = h), (q, k, v))
 
-        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+#         sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
 
-        # attention, what we cannot get enough of
-        attn = sim.softmax(dim = -1)
-        attn = self.dropout(attn)
+#         # attention, what we cannot get enough of
+#         attn = sim.softmax(dim = -1)
+#         attn = self.dropout(attn)
 
-        out = einsum('b i j, b j d -> b i d', attn, v)
-        out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
-        out = self.to_out(out)  # [B, HW, C]
-        return out
+#         out = einsum('b i j, b j d -> b i d', attn, v)
+#         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
+#         out = self.to_out(out)  # [B, HW, C]
+#         return out
 
 
 @dataclass
@@ -381,3 +382,59 @@ class BayesConvMixer3(ConvMixer):
         latent = nn.Flatten()(latent)
         logits = self.fc(latent)
         return logits
+    
+# %%
+class BayesConvMixer4(BayesConvMixer3):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.digup = AttentionWithoutParams(query_dim=cfg.hidden_dim,
+                      heads=1, 
+                      dim_head=cfg.hidden_dim
+                      )
+
+# %%
+class BayesConvMixer5(ConvMixer):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+        
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+        self.depth_attn = Attention(query_dim=cfg.hidden_dim,
+                      context_dim=cfg.hidden_dim,
+                      heads=1, 
+                      dim_head=cfg.hidden_dim
+                      )
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1,1)),
+        #     nn.Flatten(),
+        # )
+        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.skip_connection = cfg.skip_connection
+
+    def forward(self, x):
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
+
+        x = self.embed(x)
+        logits = [self.digup(x)]
+        for layer in self.layers:
+            if self.skip_connection:
+                x = x + layer(x)
+            else:
+                x = layer(x)
+            logits = logits + [self.digup(x)]
+        logits = rearrange(logits, "depth b d -> b depth d")
+        latent = self.depth_attn(latent, logits)
+        latent = self.logits_layer_norm(latent)
+        latent = nn.Flatten()(latent)
+        logits = self.fc(latent)
+        return logits
+
+
+# %%

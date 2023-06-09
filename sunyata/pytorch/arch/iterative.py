@@ -190,7 +190,7 @@ class ConvMixerattn3(nn.Module):
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+        self.latent = nn.Parameter(torch.randn(1024, cfg.hidden_dim))
 
     def forward(self, x):
         batch_size, _, _, _ = x.shape
@@ -208,7 +208,7 @@ class ConvMixerattn3(nn.Module):
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = self.attn(latent, input) + latent
             latent = self.layer_norm(latent)
-            x = repeat(latent, 'b (h w) d -> b h w d', h = x.shape[2], w = x.shape[3])
+            x = rearrange(latent, 'b (h w) d -> b h w d', h = x.shape[2], w = x.shape[3])
             x = x.permute(0, 3, 1, 2)
         # for self_conv, attn in self.layer:
         #     for conv in self_conv:

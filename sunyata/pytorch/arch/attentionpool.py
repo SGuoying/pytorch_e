@@ -131,7 +131,7 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim)
 
-    def forward(self, x, context = None):
+    def forward(self, x, context):
         # x: [B, C, H, W]
         context = context.flatten(2).transpose(1, 2)  # [B, HW, C]
         h = self.heads

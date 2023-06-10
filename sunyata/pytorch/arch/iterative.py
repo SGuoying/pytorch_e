@@ -199,8 +199,8 @@ class ConvMixerattn3(nn.Module):
         batch_size, _, _, _ = x.shape
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
         x = self.embed(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
+        # input = x.permute(0, 2, 3, 1)
+        # input = rearrange(input, 'b ... d -> b (...) d')
         latent = self.attn(latent, input)
         latent = self.layer_norm(latent)
 

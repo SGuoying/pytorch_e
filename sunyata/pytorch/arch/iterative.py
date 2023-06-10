@@ -181,8 +181,8 @@ class ConvMixerattn3(nn.Module):
         )
 
         self.digup = nn.Sequential(
-            # nn.AdaptiveAvgPool2d((1, 1)),
-            # nn.Flatten(),
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         self.attn = Attention(query_dim=cfg.hidden_dim,
@@ -209,13 +209,13 @@ class ConvMixerattn3(nn.Module):
                 x = conv(x) + x
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
-            latent = attn(latent, x) + latent
+            latent = attn(latent, input) + latent
             latent = self.layer_norm(latent)
             B, HW, C = latent.size()
             h = int(HW ** 0.5)
             x = latent.transpose(1, 2).view(B, C, h, h)
             
-        x = self.digup(latent)
+        x = self.digup(x)
         return x
     
 

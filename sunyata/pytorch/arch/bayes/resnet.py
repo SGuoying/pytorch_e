@@ -213,11 +213,6 @@ class ResNet2(ResNet):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-        input = input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = self.attn(latent, input) + latent
-        latent = self.logits_layer_norm(latent)
-
 
         for i, layer in enumerate([
             self.layer1, self.layer2,

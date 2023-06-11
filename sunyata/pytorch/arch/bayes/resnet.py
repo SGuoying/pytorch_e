@@ -153,7 +153,7 @@ class eca_layer(nn.Module):
         y = y.transpose(-1,-2).squeeze(-1)
         return y
     
-
+from einops.layers.torch import Rearrange
 # %%
 class ResNet2(ResNet):
    def __init__(
@@ -184,12 +184,14 @@ class ResNet2(ResNet):
                 nn.Conv2d(64 * i * expansion, 2048, kernel_size=1),
                 # eca_layer(3),
                 nn.AdaptiveAvgPool2d((1, 1)),
+                Rearrange('b c h w -> b (h w) c'),
                 # nn.Flatten(),
                 ) for i in (1, 2, 4) 
                 ],
             nn.Sequential(
                 # eca_layer(3),
                 self.avgpool,
+                Rearrange('b c h w -> b (h w) c'),
                 # nn.Flatten(),
             )
         ])
@@ -207,7 +209,7 @@ class ResNet2(ResNet):
    def _forward_impl(self, x: Tensor) -> Tensor:
         batch_size, _, _, _ = x.shape
         # log_prior = self.log_prior.repeat(batch_size, 1)
-        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
+        logits = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.conv1(x)
         x = self.bn1(x)
@@ -221,7 +223,7 @@ class ResNet2(ResNet):
             for block in layer:
                 x = block(x)
                 logits = self.digups[i](x)
-                input = input = x.permute(0, 2, 3, 1)
+                input = x.permute(0, 2, 3, 1)
                 input = rearrange(input, 'b ... d -> b (...) d')
                 logits = self.attn(logits, input) + logits
                 logits = self.logits_layer_norm(logits)

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from einops import rearrange, repeat
+from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange
 import torch
 import torch.nn as nn
@@ -93,14 +93,14 @@ class ConvMixerattn2(nn.Module):
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
-            Rearrange('b c h w -> b c (h w)'),
-            nn.LayerNorm(cfg.hidden_dim)
+            Rearrange('b c h w -> b (h w) c'),
             # nn.Flatten(),
             # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         self.attn = nn.Sequential(
-            Attention(cfg.hidden_dim),
             
+            Attention(cfg.hidden_dim,context_dim=cfg.hidden_dim,
+                      heads=1, dim_head=cfg.hidden_dim, dropout=0.),
             )
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
@@ -108,16 +108,20 @@ class ConvMixerattn2(nn.Module):
         self.cfg = cfg
 
     def forward(self, x):
-        logits_list = []
+        
 
         x = self.embed(x)
-        data = x.flatten(2).transpose(1, 2)  # data:init   [B, HW, C]  
-        logits = self.digup(x)
+        input = x.flatten(2).transpose(1, 2)  # data:init   [B, HW, C]  
+        logits = [self.digup(x)]
+        # logits = self.attn(logits, input)
+
         for layer in self.layers:
             x = layer(x) + x
-            logits = self.digup(x) + logits
-            logits_list.append(logits)
-        logits = torch.cat(logits_list, dim=1)
+            logits =logits + [self.digup(x)]
+            
+        logits = rearrange(logits, 'n b hw c -> b (n hw) c')
+        logits = self.attn(input, logits)
+        logits = self.layer_norm(logits)
         logits = self.fc(logits)
         # x = self.digup(x)
         return logits
@@ -193,7 +197,7 @@ class ConvMixerattn3(nn.Module):
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
 
         self.cfg = cfg
-        self.latent = nn.Parameter(torch.randn(cfg.hidden_dim, cfg.hidden_dim))
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
     def forward(self, x):
         batch_size, _, _, _ = x.shape

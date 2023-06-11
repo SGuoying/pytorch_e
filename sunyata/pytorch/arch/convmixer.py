@@ -209,7 +209,6 @@ class ConvMixereca(ConvMixer):
         logits = self.fc(logits)
         return logits
 
-
 class BayesConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -242,7 +241,6 @@ class BayesConvMixer(ConvMixer):
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
-
 
 class CombineConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -283,7 +281,6 @@ class CombineConvMixer(ConvMixer):
             # logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
-
 
 from einops.layers.torch import Rearrange, Reduce
 
@@ -350,8 +347,8 @@ class BayesConvMixer3(ConvMixer):
 
         self.digup = Attention(query_dim=cfg.hidden_dim,
                       context_dim=cfg.hidden_dim,
-                      heads=1, 
-                      dim_head=cfg.hidden_dim
+                      heads=8, 
+                      dim_head=64
                       )
         
         # self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)

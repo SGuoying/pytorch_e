@@ -98,9 +98,8 @@ class ConvMixerattn2(nn.Module):
             # nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
         self.attn = nn.Sequential(
-            
             Attention(cfg.hidden_dim,context_dim=cfg.hidden_dim,
-                      heads=1, dim_head=cfg.hidden_dim, dropout=0.),
+                      heads=1, dim_head=cfg.hidden_dim)
             )
         self.layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
@@ -118,9 +117,9 @@ class ConvMixerattn2(nn.Module):
         for layer in self.layers:
             x = layer(x) + x
             logits =logits + [self.digup(x)]
-            
         logits = rearrange(logits, 'n b hw c -> b (n hw) c')
         logits = self.attn(input, logits)
+        logits = reduce(logits, 'b (n hw) c -> b c', 'mean')
         logits = self.layer_norm(logits)
         logits = self.fc(logits)
         # x = self.digup(x)

@@ -118,7 +118,7 @@ class ConvMixerattn2(nn.Module):
             logits =logits + [self.digup(x)]
         logits = rearrange(logits, 'n b hw c -> b (n hw) c')
         logits = self.attn(input, logits)
-        logits = reduce(logits, 'b (n hw) c -> b c', 'mean')
+        logits = reduce(logits, 'b n c -> b c', 'mean')
         logits = self.layer_norm(logits)
         logits = self.fc(logits)
         # x = self.digup(x)

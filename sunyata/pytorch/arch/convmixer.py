@@ -347,8 +347,8 @@ class BayesConvMixer3(ConvMixer):
 
         self.digup = Attention(query_dim=cfg.hidden_dim,
                       context_dim=cfg.hidden_dim,
-                      heads=8, 
-                      dim_head=64
+                      heads=1, 
+                      dim_head=cfg.hidden_dim,
                       )
         
         # self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)

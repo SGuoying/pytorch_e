@@ -81,10 +81,10 @@ def deeplabv3(num_classes: int,
         pretrained = False
         if backbone_weights:
             pretrained = True
-            if backbone_weights == 'IMAGENET1K_50':
+            if backbone_weights == 'IMAGENET1K_V1':
                 resnet.model_urls[
                     backbone_arch] = 'https://download.pytorch.org/models/resnet50-0676ba61.pth'
-            elif backbone_weights == 'IMAGENET1K_101':
+            elif backbone_weights == 'IMAGENET1K_V2':
                 resnet.model_urls[
                     backbone_arch] = 'https://download.pytorch.org/models/resnet101-cd907fc2.pth'
             else:

@@ -32,9 +32,10 @@ def deeplabv3(num_classes: int,
               backbone_weights: Optional[str] = None,
               sync_bn: bool = True,
               init_fn: Optional[Callable] = None):
-    model = deeplabv3_resnet50(backbone_arch=backbone_arch,
-                      backbone_weights=backbone_weights,
-                      num_classes=num_classes,
+    model = deeplabv3_resnet50(
+        num_classes=num_classes,
+        backbone_arch=backbone_arch,
+        backbone_weights=backbone_weights,
                      )
     
     world_size = dist.get_world_size()

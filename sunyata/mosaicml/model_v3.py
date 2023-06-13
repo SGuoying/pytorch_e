@@ -3,6 +3,7 @@
 
 """DeepLabV3 model extending :class:`.ComposerClassifier`."""
 
+from collections import OrderedDict
 import functools
 import textwrap
 import warnings
@@ -40,6 +41,50 @@ class SimpleSegmentationModel(torch.nn.Module):
                                align_corners=False,
                                recompute_scale_factor=False)
         return logits
+
+class DeepLabV3(torch.nn.Module):
+    """
+    Implements DeepLabV3 model from
+    `"Rethinking Atrous Convolution for Semantic Image Segmentation"
+    <https://arxiv.org/abs/1706.05587>`_.
+
+    Args:
+        backbone (nn.Module): the network used to compute the features for the model.
+            The backbone should return an OrderedDict[Tensor], with the key being
+            "out" for the last feature map used, and "aux" if an auxiliary classifier
+            is used.
+        classifier (nn.Module): module that takes the "out" element returned from
+            the backbone and returns a dense prediction.
+        aux_classifier (nn.Module, optional): auxiliary classifier used during training
+    """
+    __constants__ = ['aux_classifier']
+
+    def __init__(self, backbone, classifier, aux_classifier=None):
+        super(DeepLabV3, self).__init__()
+        self.backbone = backbone
+        self.classifier = classifier
+        self.aux_classifier = aux_classifier
+
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        input_shape = x.shape[-2:]
+        # contract: features is a dict of tensors
+        features = self.backbone(x)
+
+        result = OrderedDict()
+        x = features["layer4"]
+        x = self.classifier(x)
+        # 使用双线性插值还原回原图尺度
+        x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False, recompute_scale_factor=False)
+        result["layer4"] = x
+
+        if self.aux_classifier is not None:
+            x = features["aux"]
+            x = self.aux_classifier(x)
+            # 使用双线性插值还原回原图尺度
+            x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
+            result["layer4"] = x
+
+        return result
 
 
 def deeplabv3(num_classes: int,
@@ -116,7 +161,8 @@ def deeplabv3(num_classes: int,
     head = torchvision.models.segmentation.deeplabv3.DeepLabHead(2048,
                                                                   num_classes=num_classes)
 
-    model = SimpleSegmentationModel(backbone, head)
+    # model = SimpleSegmentationModel(backbone, head)
+    model = DeepLabV3(backbone, head)
 
     # Only apply initialization to classifier head if pre-trained weights are used
     if init_fn:

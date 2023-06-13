@@ -21,150 +21,23 @@ from packaging import version
 from torchmetrics import MetricCollection
 from torchvision.models import _utils, resnet
 
+from sunyata.pytorch.arch.deeplabv3 import deeplabv3_resnet50
+
 __all__ = ['deeplabv3', 'build_composer_deeplabv3']
 
-
-class SimpleSegmentationModel(torch.nn.Module):
-
-    def __init__(self, backbone, classifier):
-        super().__init__()
-        self.backbone = backbone
-        self.classifier = classifier
-
-    def forward(self, x):
-        input_shape = x.shape[-2:]
-        features = self.backbone(x)
-        logits = self.classifier(features.values())
-        logits = F.interpolate(logits,
-                               size=input_shape,
-                               mode='bilinear',
-                               align_corners=False,
-                               recompute_scale_factor=False)
-        return logits
-
-class DeepLabV3(torch.nn.Module):
-    """
-    Implements DeepLabV3 model from
-    `"Rethinking Atrous Convolution for Semantic Image Segmentation"
-    <https://arxiv.org/abs/1706.05587>`_.
-
-    Args:
-        backbone (nn.Module): the network used to compute the features for the model.
-            The backbone should return an OrderedDict[Tensor], with the key being
-            "out" for the last feature map used, and "aux" if an auxiliary classifier
-            is used.
-        classifier (nn.Module): module that takes the "out" element returned from
-            the backbone and returns a dense prediction.
-        aux_classifier (nn.Module, optional): auxiliary classifier used during training
-    """
-    __constants__ = ['aux_classifier']
-
-    def __init__(self, backbone, classifier, aux_classifier=None):
-        super(DeepLabV3, self).__init__()
-        self.backbone = backbone
-        self.classifier = classifier
-        self.aux_classifier = aux_classifier
-
-    def forward(self, x):
-        input_shape = x.shape[-2:]
-        # contract: features is a dict of tensors
-        features = self.backbone(x)
-
-        result = OrderedDict()
-        x = features["layer4"]
-        x = self.classifier(x)
-        # 使用双线性插值还原回原图尺度
-        x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False, recompute_scale_factor=False)
-        result["layer4"] = x
-
-        if self.aux_classifier is not None:
-            x = features["aux"]
-            x = self.aux_classifier(x)
-            # 使用双线性插值还原回原图尺度
-            x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
-            result["layer4"] = x
-
-        return result
 
 
 def deeplabv3(num_classes: int,
               backbone_arch: str = 'resnet50',
               backbone_weights: Optional[str] = None,
               sync_bn: bool = True,
-            #   use_plus: bool = True,
               init_fn: Optional[Callable] = None):
-    """Helper function to build a mmsegmentation DeepLabV3 model.
-
-    Args:
-        num_classes (int): Number of classes in the segmentation task.
-        backbone_arch (str, optional): The architecture to use for the backbone. Must be either
-            [``'resnet50'``, ``'resnet101'``]. Default: ``'resnet101'``.
-        backbone_weights (str, optional): If specified, the PyTorch pre-trained weights to load for the backbone.
-            Currently, only ['IMAGENET1K_V1', 'IMAGENET1K_V2'] are supported. Default: ``None``.
-        sync_bn (bool, optional): If ``True``, replace all BatchNorm layers with SyncBatchNorm layers.
-            Default: ``True``.
-        use_plus (bool, optional): If ``True``, use DeepLabv3+ head instead of DeepLabv3. Default: ``True``.
-        init_fn (Callable, optional): initialization function for the model. ``()`` for no initialization.
-            Default: ``()``.
-
-    Returns:
-        deeplabv3: A DeepLabV3 :class:`torch.nn.Module`.
-
-    Example:
-    .. code-block:: python
-        from composer.models.deeplabv3.deeplabv3 import deeplabv3
-        pytorch_model = deeplabv3(num_classes=150, backbone_arch='resnet101', backbone_weights=None)
-    """
-    # check that the specified architecture is in the resnet module
-    if not hasattr(resnet, backbone_arch):
-        raise ValueError(
-            f'backbone_arch must be part of the torchvision resnet module, got value: {backbone_arch}'
-        )
-
-    # change the model weight url if specified
-    if version.parse(torchvision.__version__) < version.parse('0.13.0'):
-        pretrained = False
-        if backbone_weights:
-            pretrained = True
-            if backbone_weights == 'IMAGENET1K_V1':
-                resnet.model_urls[
-                    backbone_arch] = 'https://download.pytorch.org/models/resnet50-0676ba61.pth'
-            elif backbone_weights == 'IMAGENET1K_V2':
-                resnet.model_urls[
-                    backbone_arch] = 'https://download.pytorch.org/models/resnet101-cd907fc2.pth'
-            else:
-                ValueError(
-                    textwrap.dedent(f"""\
-                        `backbone_weights` must be either "IMAGENET1K_V1" or "IMAGENET1K_V2"
-                        if torchvision.__version__ < 0.13.0. `backbone_weights` was {backbone_weights}."""
-                                   ))
-        backbone = getattr(resnet, backbone_arch)(
-            pretrained=pretrained,
-            replace_stride_with_dilation=[False, True, True])
-    else:
-        backbone = getattr(resnet, backbone_arch)(
-            weights=backbone_weights,
-            replace_stride_with_dilation=[False, True, True])
-
-    # specify which layers to extract activations from
-    return_layers = {
-        'layer4': 'layer4'
-    }
-    backbone = _utils.IntermediateLayerGetter(backbone,
-                                              return_layers=return_layers)
-    world_size = dist.get_world_size()
-    if sync_bn and world_size == 1:
-        warnings.warn(
-            'sync_bn was true, but only one process is present for training. sync_bn will be ignored.'
-        )
+    model = deeplabv3_resnet50(backbone_arch=backbone_arch,
+                      backbone_weights=backbone_weights,
+                      num_classes=num_classes,
+                     )
     
-    head = torchvision.models.segmentation.deeplabv3.DeepLabHead(2048,
-                                                                  num_classes=num_classes)
-
-    model = SimpleSegmentationModel(backbone, head)
-    # model = DeepLabV3(backbone, head)
-
-    # Only apply initialization to classifier head if pre-trained weights are used
+    world_size = dist.get_world_size()
     if init_fn:
         if backbone_weights is None:
             model.apply(init_fn)
@@ -195,11 +68,10 @@ def deeplabv3(num_classes: int,
     return model
 
 
+
 def build_composer_deeplabv3(num_classes: int,
                              backbone_arch: str = 'resnet50',
                              backbone_weights: Optional[str] = None,
-                             sync_bn: bool = False,
-                            #  use_plus: bool = True,
                              ignore_index: int = -1,
                              cross_entropy_weight: float = 1.0,
                              dice_weight: float = 0.0,
@@ -233,11 +105,12 @@ def build_composer_deeplabv3(num_classes: int,
         from composer.models import composer_deeplabv3
         model = composer_deeplabv3(num_classes=150, backbone_arch='resnet101', backbone_weights=None)
     """
-    model = deeplabv3(backbone_arch=backbone_arch,
-                      backbone_weights=backbone_weights,
-                      num_classes=num_classes,
-                      sync_bn=sync_bn,
-                      init_fn=init_fn)
+    model = deeplabv3(
+        num_classes=num_classes,
+        backbone_arch=backbone_arch,
+        backbone_weights=backbone_weights,
+        init_fn=init_fn,
+    )
 
     train_metrics = MetricCollection([
         CrossEntropy(ignore_index=ignore_index),

@@ -43,7 +43,7 @@ class SimpleSegmentationModel(torch.nn.Module):
 
 
 def deeplabv3(num_classes: int,
-              backbone_arch: str = 'resnet101',
+              backbone_arch: str = 'resnet50',
               backbone_weights: Optional[str] = None,
               sync_bn: bool = True,
             #   use_plus: bool = True,
@@ -151,7 +151,7 @@ def deeplabv3(num_classes: int,
 
 
 def build_composer_deeplabv3(num_classes: int,
-                             backbone_arch: str = 'resnet101',
+                             backbone_arch: str = 'resnet50',
                              backbone_weights: Optional[str] = None,
                              sync_bn: bool = False,
                             #  use_plus: bool = True,

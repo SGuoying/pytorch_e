@@ -65,7 +65,7 @@ class DeepLabV3(torch.nn.Module):
         self.classifier = classifier
         self.aux_classifier = aux_classifier
 
-    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, x):
         input_shape = x.shape[-2:]
         # contract: features is a dict of tensors
         features = self.backbone(x)
@@ -161,8 +161,8 @@ def deeplabv3(num_classes: int,
     head = torchvision.models.segmentation.deeplabv3.DeepLabHead(2048,
                                                                   num_classes=num_classes)
 
-    model = SimpleSegmentationModel(backbone, head)
-    # model = DeepLabV3(backbone, head)
+    # model = SimpleSegmentationModel(backbone, head)
+    model = DeepLabV3(backbone, head)
 
     # Only apply initialization to classifier head if pre-trained weights are used
     if init_fn:

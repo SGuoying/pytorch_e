@@ -339,6 +339,11 @@ class BayesConvMixer3(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
+        self.layers = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
+
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         if cfg.layer_norm_zero_init:
             self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)

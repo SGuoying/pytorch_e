@@ -34,7 +34,7 @@ class SimpleSegmentationModel(torch.nn.Module):
     def forward(self, x):
         input_shape = x.shape[-2:]
         features = self.backbone(x)
-        logits = self.classifier(tuple(features.values()))
+        logits = self.classifier(features.values())
         logits = F.interpolate(logits,
                                size=input_shape,
                                mode='bilinear',
@@ -161,8 +161,8 @@ def deeplabv3(num_classes: int,
     head = torchvision.models.segmentation.deeplabv3.DeepLabHead(2048,
                                                                   num_classes=num_classes)
 
-    # model = SimpleSegmentationModel(backbone, head)
-    model = DeepLabV3(backbone, head)
+    model = SimpleSegmentationModel(backbone, head)
+    # model = DeepLabV3(backbone, head)
 
     # Only apply initialization to classifier head if pre-trained weights are used
     if init_fn:

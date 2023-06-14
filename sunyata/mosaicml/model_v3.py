@@ -122,7 +122,7 @@ def build_composer_deeplabv3(num_classes: int,
         MIoU(num_classes, ignore_index=ignore_index)
     ])
 
-    ce_loss_fn = functools.partial(soft_cross_entropy,
+    ce_loss_fn = functools.partial(F.cross_entropy,
                                    ignore_index=ignore_index)
     dice_loss_fn = DiceLoss(softmax=True,
                             batch=True,

@@ -281,7 +281,7 @@ class DeepLabV3(nn.Module):
         x = self.classifier(x)
         # 使用双线性插值还原回原图尺度
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False, recompute_scale_factor=False)
-        result["out"] = x
+        # result["out"] = x
 
         if self.aux_classifier is not None:
             x = features["aux"]
@@ -289,8 +289,9 @@ class DeepLabV3(nn.Module):
             # 使用双线性插值还原回原图尺度
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
             result["aux"] = x
+            x = result
 
-        return result
+        return x
 
 
 class FCNHead(nn.Sequential):

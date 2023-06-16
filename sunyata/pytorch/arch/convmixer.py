@@ -29,7 +29,7 @@ class eca_layer(nn.Module):
         return y
 
 from torch import einsum
-from einops import rearrange, repeat
+from einops import rearrange, reduce, repeat
 def exists(val):
     return val is not None
 
@@ -385,7 +385,8 @@ class BayesConvMixer3(ConvMixer):
             latent = latent + self.digup(latent, input)
             latent = self.logits_layer_norm(latent)
 
-        latent = nn.Flatten()(latent)
+        # latent = nn.Flatten()(latent)
+        latent = reduce(latent, 'b n d -> b d', 'mean')
         logits = self.fc(latent)
         return logits
     

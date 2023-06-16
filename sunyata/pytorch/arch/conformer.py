@@ -38,6 +38,34 @@ class ConvLayer(nn.Sequential):
             nn.GELU(),
         )
 
+class Convolution(nn.Module):
+    def __init__(self,
+                 cfg: ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+        self.layers = nn.ModuleList([
+            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+            for _ in range(cfg.num_layers)
+        ])
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.GELU(),
+        )
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+
+    def forward(self, x):
+        x = self.embed(x)
+        for layer in self.layers:
+            x = x + layer(x)
+        x = self.digup(x)
+        return x
+
+
 class AttnLayer(nn.Module):
     def __init__(self, 
                  query_dim, context_dim=None,
@@ -68,7 +96,6 @@ class AttnLayer(nn.Module):
         out = rearrange(out, 'b (h n) d -> b n (h d)', h=h)
         return self.to_out(out)
     
-
 class Conformer(nn.Module):
     def __init__(self,
                  cfg:ConvMixerCfg):

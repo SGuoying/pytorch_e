@@ -5,8 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from sunyata.pytorch.arch.base import BaseCfg, Residual
-from sunyata.pytorch.arch.conformer import ConvMixerCfg
-
 
 
 @dataclass

@@ -110,6 +110,7 @@ class Conformer(nn.Module):
             x = x + layer(x)
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
+            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
 

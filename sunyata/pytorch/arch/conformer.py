@@ -129,7 +129,8 @@ class Mlp(nn.Module):
         )
     def forward(self, x):
         return self.net(x)
-    
+
+
 class ConvLayer2(nn.Sequential):
     def __init__(self, hidden_dim, kernel_size, bias=False):
         super().__init__(
@@ -137,6 +138,20 @@ class ConvLayer2(nn.Sequential):
             nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
+            nn.BatchNorm2d(hidden_dim),
+            nn.GELU(),  
+        ) 
+class ConvLayer3(nn.Sequential):
+    def __init__(self, hidden_dim, kernel_size, bias=False):
+        super().__init__(
+            Residual(nn.Sequential(nn.Conv2d(hidden_dim, hidden_dim, 1),
+            nn.BatchNorm2d(hidden_dim),
+            nn.GELU(),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
+            nn.BatchNorm2d(hidden_dim),
+            nn.GELU(),
+            )),
+            nn.Conv2d(hidden_dim, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
         )     
@@ -154,7 +169,11 @@ class Conformer2(Conformer):
             ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
-        self.conv1 = nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, 1)
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, 1),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.GELU(),
+        )
         self.mlp = Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
@@ -171,17 +190,17 @@ class Conformer2(Conformer):
         latent = repeat(self.latent, 'n d -> b n d', b=batch_size)
 
         x = self.embed(x)
-        x = self.conv1(x)
-        input = x.permute(0, 2, 3, 1)
+        y = self.conv1(x)
+        input = y.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = latent + self.attn_layers(latent, input)
-        mlp = self.mlp(latent)
+        mlp = self.mlp(latent) 
 
         for layer in self.layers:
             x = x + layer(x)
-            x = self.conv1(x)
-            input = x.permute(0, 2, 3, 1)
+            y = self.conv1(x)
+            input = y.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)

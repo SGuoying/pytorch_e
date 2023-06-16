@@ -166,14 +166,14 @@ class Conformer2(Conformer):
         )
 
         self.layers = nn.ModuleList([
-            ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
+            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, 1),
-            nn.BatchNorm2d(cfg.hidden_dim),
-            nn.GELU(),
-        )
+        # self.conv1 = nn.Sequential(
+        #     nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, 1),
+        #     nn.BatchNorm2d(cfg.hidden_dim),
+        #     nn.GELU(),
+        # )
         self.mlp = Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
@@ -190,8 +190,8 @@ class Conformer2(Conformer):
         latent = repeat(self.latent, 'n d -> b n d', b=batch_size)
 
         x = self.embed(x)
-        y = self.conv1(x)
-        input = y.permute(0, 2, 3, 1)
+        # y = self.conv1(x)
+        input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = latent + self.attn_layers(latent, input)
@@ -199,8 +199,8 @@ class Conformer2(Conformer):
 
         for layer in self.layers:
             x = x + layer(x)
-            y = self.conv1(x)
-            input = y.permute(0, 2, 3, 1)
+            # y = self.conv1(x)
+            input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)

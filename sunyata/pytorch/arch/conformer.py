@@ -231,7 +231,8 @@ class Conformer2(Conformer):
         self.attn_mlp.append(nn.ModuleList([PreNorm(cfg.hidden_dim, AttnLayer(query_dim=cfg.hidden_dim,
                                                                context_dim=cfg.hidden_dim,
                                                                heads=1,
-                                                               dim_head=cfg.hidden_dim)),
+                                                               dim_head=cfg.hidden_dim),
+                                                               context_dim=cfg.hidden_dim),
                                             PreNorm(cfg.hidden_dim, Mlp(cfg.hidden_dim, cfg.hidden_dim * 4))
                                                                ]))
         # self.attn_mlp.append(PreNorm(cfg.hidden_dim, Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)))

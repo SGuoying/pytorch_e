@@ -92,7 +92,8 @@ class PreNorm(nn.Module):
         if self.norm_context is not None:
             context = kwargs['context']
             normed_context = self.norm_context(context)
-            kwargs.update(context = normed_context)
+            # kwargs.update(context = normed_context)
+            kwargs['context'] = normed_context
 
         return self.fn(x, **kwargs)
 

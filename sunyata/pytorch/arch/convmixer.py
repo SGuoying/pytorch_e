@@ -340,7 +340,7 @@ class BayesConvMixer3(ConvMixer):
         super().__init__(cfg)
 
         self.layers = nn.Sequential(*[
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 

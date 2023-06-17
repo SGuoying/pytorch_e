@@ -253,7 +253,7 @@ class Conformer2(Conformer):
         latent = self.norm(latent)
         for attn, mlp in self.attn_mlp:
             latent = latent + attn(latent, input)
-            mlp = mlp(latent) + latent
+            latent = mlp(latent) + latent
         # latent = latent + self.attn_layers(latent, input)
         # mlp = self.mlp(latent) 
 
@@ -269,9 +269,9 @@ class Conformer2(Conformer):
             latent = self.norm(latent)
             for attn, mlp in self.attn_mlp:
                 latent = latent + attn(latent, input)
-                mlp = mlp + mlp(latent)
+                latent = latent + mlp(latent)
 
-        latent = reduce(mlp, 'b n d -> b d', 'mean')
+        latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.to_logits(latent)
     
 

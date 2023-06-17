@@ -92,8 +92,8 @@ class PreNorm(nn.Module):
         if self.norm_context is not None:
             context = kwargs['context']
             normed_context = self.norm_context(context)
-            # kwargs.update(context = normed_context)
-            kwargs['context'] = normed_context
+            kwargs.update(context = normed_context)
+            # kwargs['context'] = normed_context
 
         return self.fn(x, **kwargs)
 
@@ -222,21 +222,14 @@ class Conformer2(Conformer):
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
-        # self.conv1 = nn.Sequential(
-        #     nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, 1),
-        #     nn.BatchNorm2d(cfg.hidden_dim),
-        #     nn.GELU(),
-        # )
-
+        
         self.attn_mlp = nn.ModuleList([])
-        self.attn_mlp.append(nn.ModuleList([PreNorm(cfg.hidden_dim, AttnLayer(query_dim=cfg.hidden_dim,
+        self.attn_mlp.append(nn.ModuleList([AttnLayer(query_dim=cfg.hidden_dim,
                                                                context_dim=cfg.hidden_dim,
                                                                heads=1,
                                                                dim_head=cfg.hidden_dim),
-                                                               context_dim=cfg.hidden_dim),
-                                            PreNorm(cfg.hidden_dim, Mlp(cfg.hidden_dim, cfg.hidden_dim * 4))
-                                                               ]))
-        # self.attn_mlp.append(PreNorm(cfg.hidden_dim, Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)))
+                                             Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)])
+        )
 
         # self.mlp = Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
 
@@ -245,7 +238,7 @@ class Conformer2(Conformer):
         #                             heads=1,
         #                             dim_head=cfg.hidden_dim,
         #                             )
-        # self.norm = nn.LayerNorm(cfg.hidden_dim)
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
@@ -257,9 +250,10 @@ class Conformer2(Conformer):
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = self.norm(latent)
         for attn, mlp in self.attn_mlp:
             latent = latent + attn(latent, input)
-            mlp = mlp(latent)
+            mlp = mlp(latent) + latent
         # latent = latent + self.attn_layers(latent, input)
         # mlp = self.mlp(latent) 
 
@@ -272,6 +266,7 @@ class Conformer2(Conformer):
             # latent = self.norm(latent)
             # mlp = self.mlp(latent) + mlp
             # mlp = self.norm(mlp)
+            latent = self.norm(latent)
             for attn, mlp in self.attn_mlp:
                 latent = latent + attn(latent, input)
                 mlp = mlp + mlp(latent)

@@ -5,10 +5,11 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 from sunyata.pytorch.arch.base import BaseCfg
+from sunyata.pytorch.arch.convmixer import ConvMixerCfg
 
 
 @dataclass
-class ConvMixerCfg(BaseCfg):
+class ConvMixerCfg(ConvMixerCfg):
     num_layers: int = 8
     hidden_dim: int = 256
     image_size: int = 224

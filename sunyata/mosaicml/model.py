@@ -5,6 +5,7 @@ from composer.metrics import CrossEntropy
 from composer.models import ComposerClassifier
 from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
+from sunyata.pytorch.arch.Vit_pytorch import ViT
 from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Convolution
 
 from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixerCat, ConvMixerCfg, ConvMixer, BayesConvMixer, ConvMixereca
@@ -52,6 +53,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = Conformer2(cfg)
     elif model_name == "Conformer3":
         model = Conformer3(cfg)
+    elif model_name == "vit":
+        model = ViT(cfg)
 
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

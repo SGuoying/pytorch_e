@@ -230,14 +230,6 @@ class Conformer2(Conformer):
                                                                dim_head=cfg.hidden_dim),
                                              Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)])
         )
-
-        # self.mlp = Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
-
-        # self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
-        #                             context_dim=cfg.hidden_dim,
-        #                             heads=1,
-        #                             dim_head=cfg.hidden_dim,
-        #                             )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))

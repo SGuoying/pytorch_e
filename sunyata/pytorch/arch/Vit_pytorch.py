@@ -131,12 +131,12 @@ class ViT(nn.Module):
             cfg.hidden_dim*4, 
             cfg.drop_rate)
 
-        self.pool = cfg
+        self.pool = cfg.pool
         self.to_latent = nn.Identity()
 
         self.mlp_head = nn.Sequential(
-            nn.LayerNorm(cfg),
-            nn.Linear(cfg.hidden_dim, cfg)
+            nn.LayerNorm(cfg.hidden_dim),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
 
     def forward(self, img):

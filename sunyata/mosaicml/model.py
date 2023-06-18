@@ -5,10 +5,10 @@ from composer.metrics import CrossEntropy
 from composer.models import ComposerClassifier
 from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
-from sunyata.pytorch.arch.Vit_pytorch import ViT
+from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg, ViT
 from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Convolution
 
-from sunyata.pytorch.arch.convmixer import ConvMixerCfg, BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixerCat, ConvMixer, BayesConvMixer, ConvMixereca
+from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixerCat, ConvMixer, BayesConvMixer, ConvMixereca
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
                              num_layers: int = 8,

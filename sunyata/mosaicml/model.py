@@ -20,6 +20,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
                              layer_norm_zero_init: bool = False,
                              skip_connection: bool = True,
                              eca_kernel_size: int = 3,
+                             image_size: int = 224,
+                             pool: str = 'cls' # or 'mean'
                              ):
     
     cfg = ConvMixerCfg(
@@ -31,6 +33,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         layer_norm_zero_init = layer_norm_zero_init,
         skip_connection = skip_connection,
         eca_kernel_size = eca_kernel_size,
+        image_size = image_size,
+        pool = pool
     )
 
     if model_name == "convmixer":

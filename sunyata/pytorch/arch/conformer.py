@@ -396,13 +396,13 @@ class Conformer4(Conformer):
         #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
         #     for _ in range(cfg.num_layers)
         # ])
-        self.layers = []
+        self.layers = nn.ModuleList([])
         for _ in range(cfg.num_layers):
-            self.layers.append(ConvTransBlock(cfg.hidden_dim, 
-                                             cfg.kernel_size, 
-                                             1, 
-                                             cfg.hidden_dim))
-        self.layers = nn.ModuleList(self.layers)
+            self.layers.append(nn.ModuleList([
+                ConvTransBlock(cfg.hidden_dim, 
+                               cfg.kernel_size, 
+                               1, 
+                               cfg.hidden_dim)]))
 
         self.attn_layers = transformer(cfg.hidden_dim, 
                                        1, 

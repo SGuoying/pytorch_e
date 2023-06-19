@@ -338,8 +338,8 @@ class Conformer3(nn.Module):
         x = self.embed(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = torch.cat([latent, input], dim=1)
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # latent = torch.cat([latent, input], dim=1)
         latent = latent + self.attn_layers(latent, input)
         latent = self.norm(latent)
 
@@ -347,7 +347,7 @@ class Conformer3(nn.Module):
             x = layer(x)
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
-            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
 
@@ -366,17 +366,25 @@ class Conformer4(Conformer):
         )
 
         self.layers = nn.ModuleList([
-            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+            ConvLayer(cfg.hidden_dim, cfg.kernel_size),
+            # Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
             for _ in range(cfg.num_layers)
         ])
+
+        self.mlp = Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
+        self.attn = AttnLayer(query_dim=cfg.hidden_dim,
+                                context_dim=cfg.hidden_dim,
+                                heads=1,
+                                dim_head=cfg.hidden_dim)
         
-        self.attn_mlp = nn.ModuleList([])
-        self.attn_mlp.append(nn.ModuleList([AttnLayer(query_dim=cfg.hidden_dim,
-                                                               context_dim=cfg.hidden_dim,
-                                                               heads=1,
-                                                               dim_head=cfg.hidden_dim),
-                                             Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)])
-        )
+        
+        # self.attn_mlp = nn.ModuleList([])
+        # self.attn_mlp.append(nn.ModuleList([AttnLayer(query_dim=cfg.hidden_dim,
+        #                                                        context_dim=cfg.hidden_dim,
+        #                                                        heads=1,
+        #                                                        dim_head=cfg.hidden_dim),
+        #                                      Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)])
+        # )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
@@ -392,12 +400,11 @@ class Conformer4(Conformer):
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = latent + self.attn(latent, input)
         latent = self.norm(latent)
-        for attn, mlp in self.attn_mlp:
-            latent = latent + attn(latent, input)
-            # logits = logits + mlp(latent) 
-            logits = latent + logits
-            logits = logits + mlp(logits)
+        logits = logits + self.mlp(latent)
+        logits = self.norm(logits)
+        
         # latent = latent + self.attn_layers(latent, input)
         # mlp = self.mlp(latent) 
 
@@ -406,16 +413,11 @@ class Conformer4(Conformer):
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            # latent = latent + self.attn_layers(latent, input)
-            # latent = self.norm(latent)
-            # mlp = self.mlp(latent) + mlp
-            # mlp = self.norm(mlp)
+            latent = latent + self.attn(latent, input)
             latent = self.norm(latent)
-            for attn, mlp in self.attn_mlp:
-                latent = latent + attn(latent, input)
-                logits = latent + logits
-                logits = logits + mlp(logits)
-
+            logits = logits + self.mlp(latent)
+            logits = self.norm(logits)
+           
         logits = reduce(logits, 'b n d -> b d', 'mean')
         return self.to_logits(logits)
     

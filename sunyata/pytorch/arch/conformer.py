@@ -52,16 +52,44 @@ class Mlp(nn.Module):
     def forward(self, x):
         return self.net(x)
     
-class ConvLayer2(nn.Sequential):
+class ConvLayer2(nn.Module):
     def __init__(self, hidden_dim, kernel_size, bias=False):
-        super().__init__(
+        super().__init__()
+        self.conv1 = nn.Sequential(
             nn.Conv2d(hidden_dim, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
-            nn.GELU(),
+            nn.GELU(),)
+        self.conv2 = nn.Sequential(
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
             nn.BatchNorm2d(hidden_dim),
-            nn.GELU(),  
-        ) 
+            nn.GELU(),)
+        self.conv3 = nn.Sequential(
+            SE(hidden_dim),
+            nn.GELU())
+    def forward(self, x):
+        x1 = self.conv1(x)
+        x2 = self.conv2(x)
+        x3 = self.conv3(x)
+        x = x1 + x2 + x3
+        return x
+  
+
+class SE(nn.Module):
+    def __init__(self, hidden_dim):
+        super().__init__()
+        self.conv = nn.Conv2d(hidden_dim, hidden_dim, 1)
+        self.gap = nn.AdaptiveAvgPool2d(1)
+        self.sigmoid = nn.Sigmoid()
+        self.norm = nn.BatchNorm2d(hidden_dim)
+    def forward(self, x):
+        bn = self.norm(x)
+        se = self.gap(bn)
+        se = self.conv(se)
+        se = self.sigmoid(se)
+
+        x = torch.mul(bn, se)
+        return x
+
 
 class ConvLayer3(nn.Sequential):
     def __init__(self, hidden_dim, kernel_size, bias=False):
@@ -134,8 +162,12 @@ class Convolution(nn.Module):
                  cfg: ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
+        # self.layers = nn.ModuleList([
+        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+        #     for _ in range(cfg.num_layers)
+        # ])
         self.layers = nn.ModuleList([
-            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+            ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
         self.embed = nn.Sequential(
@@ -164,8 +196,13 @@ class Conformer(nn.Module):
                  cfg:ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
+        # self.layers = nn.ModuleList([
+        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+        #     for _ in range(cfg.num_layers)
+        # ])
+        #  6-19  10:50
         self.layers = nn.ModuleList([
-            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+            ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
 
@@ -303,16 +340,16 @@ class Conformer3(nn.Module):
         x = self.embed(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = torch.cat([latent, input], dim=1)
         latent = latent + self.attn_layers(latent, input)
-        # latent = rearrange(latent[:, 1:], 'b (h w) d -> b d h w', h=x.shape[2])
         latent = self.norm(latent)
 
         for layer in self.layers:
             x = layer(x)
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
-            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
 

@@ -369,6 +369,8 @@ class BayesConvMixer3(ConvMixer):
         input = rearrange(input, 'b ... d -> b (...) d')
         # new add
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # latent = torch.cat([latent, input], dim=1)
+
         latent = latent + self.digup(latent, input)
         latent = self.logits_layer_norm(latent)
 

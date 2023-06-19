@@ -369,6 +369,19 @@ class transformer(nn.Module):
         x = self.norm2(x)
         return x
 
+class ConvTransBlock(nn.Module):
+    def __init__(self, hidden_dim, kernel_size, heads, dim_head, drop_rate=0.):
+        super().__init__()
+        self.cnn_block = ConvLayer(hidden_dim, kernel_size, drop_rate)
+        self.transformer_block = transformer(hidden_dim, heads, dim_head, drop_rate)
+
+    def forward(self, x, latent):
+        x = x + self.cnn_block(x)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = torch.cat([latent[:, 0][:, None, :], x], dim=1)
+        latent = self.transformer_block(latent, input)
+        return x, latent
 
 class Conformer4(Conformer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -379,15 +392,22 @@ class Conformer4(Conformer):
             nn.GELU(),
         )
 
-        self.layers = nn.ModuleList([
-            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-            for _ in range(cfg.num_layers)
-        ])
+        # self.layers = nn.ModuleList([
+        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+        #     for _ in range(cfg.num_layers)
+        # ])
+        self.layers = []
+        for _ in range(cfg.num_layers):
+            self.layers.append(ConvTransBlock(cfg.hidden_dim, 
+                                             cfg.kernel_size, 
+                                             1, 
+                                             cfg.hidden_dim))
+        self.layers = nn.ModuleList(self.layers)
 
         self.attn_layers = transformer(cfg.hidden_dim, 
                                        1, 
                                        cfg.hidden_dim,)
-        self.norm = nn.LayerNorm(cfg.hidden_dim)
+        # self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
@@ -400,16 +420,14 @@ class Conformer4(Conformer):
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = self.attn_layers(latent, input)
-        
-        # latent = latent + self.attn_layers(latent, input)
-        # mlp = self.mlp(latent) 
 
         for layer in self.layers:
-            x = x + layer(x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            latent = self.attn_layers(latent, input)
+            # x = x + layer(x)
+            # input = x.permute(0, 2, 3, 1)
+            # input = rearrange(input, 'b ... d -> b (...) d')
+            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            # latent = self.attn_layers(latent, input)
+            x, latent = layer(x, latent)
            
         latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.to_logits(latent)

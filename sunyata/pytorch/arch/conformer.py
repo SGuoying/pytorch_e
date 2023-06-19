@@ -162,14 +162,11 @@ class Convolution(nn.Module):
                  cfg: ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
-        # self.layers = nn.ModuleList([
-        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-        #     for _ in range(cfg.num_layers)
-        # ])
         self.layers = nn.ModuleList([
-            ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
+            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
+        
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
             nn.BatchNorm2d(cfg.hidden_dim),
@@ -196,15 +193,16 @@ class Conformer(nn.Module):
                  cfg:ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
-        # self.layers = nn.ModuleList([
-        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-        #     for _ in range(cfg.num_layers)
-        # ])
-        #  6-19  10:50
         self.layers = nn.ModuleList([
-            ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
+            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
+
+        #  6-19  10:50
+        # self.layers = nn.ModuleList([
+        #     ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
+        #     for _ in range(cfg.num_layers)
+        # ])
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,

@@ -366,8 +366,7 @@ class Conformer4(Conformer):
         )
 
         self.layers = nn.ModuleList([
-            ConvLayer(cfg.hidden_dim, cfg.kernel_size),
-            # Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
+            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
 

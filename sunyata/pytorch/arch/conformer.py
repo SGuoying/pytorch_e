@@ -198,12 +198,6 @@ class Conformer(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
-        #  6-19  10:50
-        # self.layers = nn.ModuleList([
-        #     ConvLayer2(cfg.hidden_dim, cfg.kernel_size)
-        #     for _ in range(cfg.num_layers)
-        # ])
-
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
@@ -356,6 +350,26 @@ class Conformer3(nn.Module):
 
 
 # layer 4 #########################################################
+class transformer(nn.Module):
+    def __init__(self, hidden_dim, heads, dim_head, dropout=0.):
+        super().__init__()
+        self.attn = AttnLayer(query_dim=hidden_dim,
+                                context_dim=hidden_dim,
+                                heads=heads,
+                                dim_head=dim_head,
+                                dropout=dropout)
+        self.mlp = Mlp(hidden_dim, hidden_dim * 4)
+        self.norm1 = nn.LayerNorm(hidden_dim)
+        self.norm2 = nn.LayerNorm(hidden_dim)
+
+    def forward(self, x, input):
+        x = x + self.attn(x, input)
+        x = self.norm1(x)
+        x = x + self.mlp(x)
+        x = self.norm2(x)
+        return x
+
+
 class Conformer4(Conformer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -370,39 +384,22 @@ class Conformer4(Conformer):
             for _ in range(cfg.num_layers)
         ])
 
-        self.mlp = Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)
-        self.attn = AttnLayer(query_dim=cfg.hidden_dim,
-                                context_dim=cfg.hidden_dim,
-                                heads=1,
-                                dim_head=cfg.hidden_dim)
-        
-        
-        # self.attn_mlp = nn.ModuleList([])
-        # self.attn_mlp.append(nn.ModuleList([AttnLayer(query_dim=cfg.hidden_dim,
-        #                                                        context_dim=cfg.hidden_dim,
-        #                                                        heads=1,
-        #                                                        dim_head=cfg.hidden_dim),
-        #                                      Mlp(cfg.hidden_dim, cfg.hidden_dim * 4)])
-        # )
+        self.attn_layers = transformer(cfg.hidden_dim, 
+                                       1, 
+                                       cfg.hidden_dim,)
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
-        self.logits = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
     def forward(self, x):
         batch_size, _, _, _ = x.shape
         latent = repeat(self.latent, 'n d -> b n d', b=batch_size)
-        logits = repeat(self.logits, 'n d -> b n d', b=batch_size)
 
         x = self.embed(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = latent + self.attn(latent, input)
-        latent = self.norm(latent)
-        logits = logits + self.mlp(latent)
-        logits = self.norm(logits)
+        latent = self.attn_layers(latent, input)
         
         # latent = latent + self.attn_layers(latent, input)
         # mlp = self.mlp(latent) 
@@ -412,13 +409,10 @@ class Conformer4(Conformer):
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            latent = latent + self.attn(latent, input)
-            latent = self.norm(latent)
-            logits = logits + self.mlp(latent)
-            logits = self.norm(logits)
+            latent = self.attn_layers(latent, input)
            
-        logits = reduce(logits, 'b n d -> b d', 'mean')
-        return self.to_logits(logits)
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        return self.to_logits(latent)
     
 
 

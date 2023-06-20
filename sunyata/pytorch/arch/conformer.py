@@ -379,7 +379,7 @@ class ConvTransBlock(nn.Module):
         x = x + self.cnn_block(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], x], dim=1)
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = self.transformer_block(latent, input)
         return x, latent
 

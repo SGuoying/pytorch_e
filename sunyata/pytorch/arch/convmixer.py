@@ -129,11 +129,8 @@ class ConvMixer2(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
 
-        self.layer2 = ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-        
-
-        self.layer1 = nn.ModuleList([
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        self.layers = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
@@ -145,29 +142,21 @@ class ConvMixer2(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
 
-        self.digup = ecablock(cfg.hidden_dim, cfg.eca_kernel_size)
-          
-        self.fc = nn.Sequential(
+        self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.LayerNorm(cfg.hidden_dim),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
 
         self.cfg = cfg
-        self.logits = nn.Parameter(torch.randn(1, cfg.hidden_dim, 1, 1))
 
     def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        logits = repeat(self.logits, '1 d 1 1 -> b d 1 1', b = batch_size)
+        # batch_size, _, _, _ = x.shape
+        # logits = repeat(self.logits, '1 d 1 1 -> b d 1 1', b = batch_size)
 
         x = self.embed(x)
-        # logits = self.digup(x)
-        for layer1 in self.layer1:
-            x = x + layer1(x)
-            logits = logits + self.digup(x)
-            logits = self.layer2(logits)
-        x = self.fc(logits)
+        x = self.layers(x)
+        x = self.digup(x)
         return x
   
 class ConvMixereca(ConvMixer):

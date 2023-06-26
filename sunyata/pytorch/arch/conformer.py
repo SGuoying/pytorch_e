@@ -218,7 +218,6 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-
         # x = self.eca(x)
 
         input = x.permute(0, 2, 3, 1)
@@ -230,7 +229,6 @@ class Conformer(nn.Module):
 
         for layer in self.layers:
             x = x + layer(x)
-
             # x = self.eca(x)
 
             input = x.permute(0, 2, 3, 1)

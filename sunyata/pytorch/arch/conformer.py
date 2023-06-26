@@ -197,8 +197,7 @@ class Conformer(nn.Module):
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
-
-        self.eca = ecablock(cfg.hidden_dim, cfg.eca_kernel_size)
+        # self.eca = ecablock(cfg.hidden_dim, cfg.eca_kernel_size)
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
@@ -220,7 +219,7 @@ class Conformer(nn.Module):
 
         x = self.embed(x)
 
-        x = self.eca(x)
+        # x = self.eca(x)
 
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
@@ -232,8 +231,8 @@ class Conformer(nn.Module):
         for layer in self.layers:
             x = x + layer(x)
 
-            x = self.eca(x)
-            
+            # x = self.eca(x)
+
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -314,10 +313,7 @@ class Conformer3(nn.Module):
                  cfg:ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
-        # self.layers = nn.ModuleList([
-        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-        #     for _ in range(cfg.num_layers)
-        # ])
+
         self.layers = nn.Sequential(*[
             ConvLayer3(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
@@ -404,10 +400,6 @@ class Conformer4(Conformer):
             nn.GELU(),
         )
 
-        # self.layers = nn.ModuleList([
-        #     ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-        #     for _ in range(cfg.num_layers)
-        # ])
         self.layers = nn.ModuleList()
         for _ in range(cfg.num_layers):
             self.layers.append(
@@ -434,11 +426,6 @@ class Conformer4(Conformer):
         latent = self.attn_layers(latent, input)
 
         for layer in self.layers:
-            # x = x + layer(x)
-            # input = x.permute(0, 2, 3, 1)
-            # input = rearrange(input, 'b ... d -> b (...) d')
-            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            # latent = self.attn_layers(latent, input)
             x, latent = layer(x, latent)
            
         latent = reduce(latent, 'b n d -> b d', 'mean')

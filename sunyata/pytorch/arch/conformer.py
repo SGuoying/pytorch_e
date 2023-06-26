@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import BaseCfg, Residual
+from sunyata.pytorch.arch.base import BaseCfg, Residual, ecablock
 
 
 @dataclass
@@ -198,6 +198,8 @@ class Conformer(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
+        self.eca = ecablock(cfg.hidden_dim, cfg.eca_kernel_size)
+
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
@@ -217,6 +219,9 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
+
+        x = self.eca(x)
+
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -226,6 +231,9 @@ class Conformer(nn.Module):
 
         for layer in self.layers:
             x = x + layer(x)
+
+            x = self.eca(x)
+            
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -271,9 +279,11 @@ class Conformer2(Conformer):
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = self.norm(latent)
+        # latent = self.norm(latent)
         for attn, mlp in self.attn_mlp:
+            latent = self.norm(latent)
             latent = latent + attn(latent, input)
+            latent = self.norm(latent)
             latent = latent + mlp(latent) 
         # latent = latent + self.attn_layers(latent, input)
         # mlp = self.mlp(latent) 
@@ -287,9 +297,11 @@ class Conformer2(Conformer):
             # latent = self.norm(latent)
             # mlp = self.mlp(latent) + mlp
             # mlp = self.norm(mlp)
-            latent = self.norm(latent)
+            # latent = self.norm(latent)
             for attn, mlp in self.attn_mlp:
+                latent = self.norm(latent)
                 latent = latent + attn(latent, input)
+                latent = self.norm(latent)
                 latent = latent + mlp(latent)
 
         latent = reduce(latent, 'b n d -> b d', 'mean')

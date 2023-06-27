@@ -275,7 +275,7 @@ class Conformer3(nn.Module):
         self.cfg = cfg
 
         self.layers = nn.Sequential(*[
-            ConvLayer3(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
 

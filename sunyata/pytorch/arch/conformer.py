@@ -25,7 +25,7 @@ class ConvMixerCfg(BaseCfg):
 
 
 class ConvLayer(nn.Sequential):
-    def __init__(self, hidden_dim: int, kernel_size: int):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate = 0.):
         super().__init__(
             nn.Conv2d(hidden_dim, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
@@ -54,7 +54,7 @@ class Mlp(nn.Module):
 
 
 class ConvLayer3(nn.Sequential):
-    def __init__(self, hidden_dim: int, kernel_size: int):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate=0.):
         super().__init__(
             Residual(nn.Sequential(
             nn.Conv2d(hidden_dim, hidden_dim, 1),
@@ -340,7 +340,8 @@ class transformer(nn.Module):
 class ConvTransBlock(nn.Module):
     def __init__(self, hidden_dim, kernel_size, heads, dim_head, drop_rate=0.):
         super().__init__()
-        self.cnn_block = ConvLayer(hidden_dim, kernel_size, drop_rate)
+        # self.cnn_block = ConvLayer(hidden_dim, kernel_size, drop_rate)
+        self.cnn_block = ConvLayer3(hidden_dim, kernel_size, drop_rate)
         self.transformer_block = transformer(hidden_dim, heads, dim_head, drop_rate)
 
     def forward(self, x, latent):

@@ -27,16 +27,29 @@ class ConvMixerCfg(BaseCfg):
 class ConvLayer(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate = 0.):
         super().__init__(
+            # nn.Conv2d(hidden_dim, hidden_dim, 1),
+            # nn.BatchNorm2d(hidden_dim),
+            # nn.GELU(),
+            # # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
+            # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2),
+            # nn.BatchNorm2d(hidden_dim),
+            # nn.GELU(),
+            # nn.Conv2d(hidden_dim, hidden_dim, 1),
+            # nn.BatchNorm2d(hidden_dim),
+            # nn.GELU(),
             nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+        
             # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            
             nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            
         )
 
 class Mlp(nn.Module):
@@ -182,7 +195,6 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-        # x = self.eca(x)
 
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
@@ -193,7 +205,6 @@ class Conformer(nn.Module):
 
         for layer in self.layers:
             x = x + layer(x)
-            # x = self.eca(x)
 
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')

@@ -41,8 +41,8 @@ class ConvLayer(nn.Sequential):
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim),
         
-            # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
+            # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim),
             

@@ -183,8 +183,9 @@ class Conformer(nn.Module):
                                      dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
-            nn.BatchNorm2d(cfg.hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            # nn.GELU(),
         )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)

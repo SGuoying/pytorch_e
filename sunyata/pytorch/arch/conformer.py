@@ -174,7 +174,6 @@ class Conformer(nn.Module):
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
-        # self.eca = ecablock(cfg.hidden_dim, cfg.eca_kernel_size)
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
@@ -196,7 +195,6 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -206,7 +204,6 @@ class Conformer(nn.Module):
 
         for layer in self.layers:
             x = x + layer(x)
-
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)

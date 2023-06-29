@@ -183,9 +183,9 @@ class Conformer(nn.Module):
                                      dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
-            nn.GELU(),
-            nn.BatchNorm2d(cfg.hidden_dim),
             # nn.GELU(),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.GELU(),
         )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
@@ -254,10 +254,10 @@ class Conformer2(Conformer):
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         # latent = self.norm(latent)
         for attn, mlp in self.attn_mlp:
-            latent = self.norm(latent)
-            latent = latent + attn(latent, input)
-            latent = self.norm(latent)
-            latent = latent + mlp(latent) 
+            # latent = self.norm(latent)
+            latent = latent + attn(self.norm(latent), input)
+            # latent = self.norm(latent)
+            latent = latent + mlp(self.norm(latent)) 
         # latent = latent + self.attn_layers(latent, input)
         # mlp = self.mlp(latent) 
 
@@ -272,10 +272,10 @@ class Conformer2(Conformer):
             # mlp = self.norm(mlp)
             # latent = self.norm(latent)
             for attn, mlp in self.attn_mlp:
-                latent = self.norm(latent)
-                latent = latent + attn(latent, input)
-                latent = self.norm(latent)
-                latent = latent + mlp(latent)
+                # latent = self.norm(latent)
+                latent = latent + attn(self.norm(latent), input)
+                # latent = self.norm(latent)
+                latent = latent + mlp(self.norm(latent))
 
         latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.to_logits(latent)

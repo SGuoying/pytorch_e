@@ -24,32 +24,46 @@ class ConvMixerCfg(BaseCfg):
 
 
 
+# class ConvLayer(nn.Sequential):
+#     def __init__(self, hidden_dim: int, kernel_size: int, ):
+#         super().__init__(
+#             nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#             # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
+#             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2, bias=False),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#             nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#             # nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             # nn.GELU(),
+#             # nn.BatchNorm2d(hidden_dim),
+        
+#             # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
+#             # # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2),
+#             # nn.GELU(),
+#             # nn.BatchNorm2d(hidden_dim),
+            
+#             # nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             # nn.GELU(),
+#             # nn.BatchNorm2d(hidden_dim),
+            
+#         )
+
 class ConvLayer(nn.Sequential):
-    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate = 0.):
+    def __init__(self, hidden_dim, kernel_size, bias=False):
         super().__init__(
             nn.Conv2d(hidden_dim, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
-            # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2, bias=False),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
             nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
             nn.Conv2d(hidden_dim, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
-            # nn.Conv2d(hidden_dim, hidden_dim, 1),
-            # nn.GELU(),
-            # nn.BatchNorm2d(hidden_dim),
-        
-            # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding=kernel_size//2),
-            # # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2),
-            # nn.GELU(),
-            # nn.BatchNorm2d(hidden_dim),
-            
-            # nn.Conv2d(hidden_dim, hidden_dim, 1),
-            # nn.GELU(),
-            # nn.BatchNorm2d(hidden_dim),
-            
         )
 
 class Mlp(nn.Module):
@@ -182,7 +196,6 @@ class Conformer(nn.Module):
                                      dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
-            # nn.GELU(),
             nn.BatchNorm2d(cfg.hidden_dim),
             nn.GELU(),
         )

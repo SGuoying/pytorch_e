@@ -52,7 +52,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
 
     elif model_name == "ConvNeXtV2":
         model = ConvNeXtV2(in_chans=3,
-                           num_classes=cfg.num_classes,)
+                           num_classes=cfg.num_classes,
+                           dims=[64, 128, 256, 512])
 
     elif model_name == "Convolution":
         model = Convolution(cfg)

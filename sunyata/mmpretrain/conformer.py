@@ -242,7 +242,7 @@ class Conformer(BaseBackbone):
                                dim_head=self.embed_dims,
                                )
         self.latent = nn.Parameter(torch.randn(1, self.embed_dims))
-        self.norm = build_norm_layer(norm_cfg, self.embed_dims)[1]
+        self.norm = build_norm_layer(last_norm, self.embed_dims)[1]
 
         self._freeze_stages()
 

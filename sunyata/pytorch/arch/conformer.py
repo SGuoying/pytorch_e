@@ -334,7 +334,7 @@ class Conformer_2(nn.Module):
 class Conformer2(Conformer):
     def __init__(self,
                  cfg:ConvMixerCfg):
-        super().__init__()
+        super().__init__(cfg=cfg)
         self.cfg = cfg
         self.layers = nn.ModuleList([
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)

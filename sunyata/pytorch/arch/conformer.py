@@ -298,7 +298,7 @@ class Conformer_2(nn.Module):
         self.fc = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes),
         )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)

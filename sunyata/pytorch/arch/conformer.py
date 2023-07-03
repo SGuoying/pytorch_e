@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import BaseCfg, Residual, ecablock
+from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer2, Residual, ecablock
 
 
 @dataclass
@@ -190,6 +190,11 @@ class Conformer(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
+        self.conv_block = nn.ModuleList([
+            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+            for _ in range(cfg.num_layers // 2)
+        ])
+
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
@@ -209,6 +214,7 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
+        x = x + self.conv_block(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -340,8 +346,13 @@ class Conformer2(Conformer):
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
         ])
+        
+        self.conv_block = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
 
-        self.attn_layers = AttnLayer2(
+        self.attn_layers = AttnLayer(
             dim=cfg.hidden_dim,
             heads=1,
             dim_head=cfg.hidden_dim,
@@ -361,6 +372,7 @@ class Conformer2(Conformer):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
+        x = x + self.conv_block(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)

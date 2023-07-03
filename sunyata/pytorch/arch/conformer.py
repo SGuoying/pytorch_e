@@ -349,7 +349,7 @@ class Conformer2(Conformer):
         
         self.conv_block = nn.Sequential(*[
             ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
+            for _ in range(cfg.num_layers // 2)
         ])
 
         self.attn_layers = AttnLayer(

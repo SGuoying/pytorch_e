@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer2, Residual, ecablock
+from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, Residual, ecablock
 
 
 @dataclass
@@ -351,7 +351,7 @@ class Conformer2(Conformer):
         ])
         
         self.conv_block = nn.Sequential(*[
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers // 2)
         ])
 
@@ -374,13 +374,16 @@ class Conformer2(Conformer):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-        x = x + self.conv_block(x)
+        
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = torch.cat([latent, input], dim=1)
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # latent = torch.cat([latent, input], dim=1)
         latent = latent + self.attn_layers(latent)
         latent = self.norm(latent)
+
+        for conv in self.conv_block:
+            x = x + conv(x)
 
         for layer in self.layers:
             x = x + layer(x)

@@ -352,12 +352,11 @@ class Conformer2(Conformer):
             for _ in range(cfg.num_layers // 2)
         ])
 
-        self.attn_layers = AttnLayer(
-            dim=cfg.hidden_dim,
-            heads=1,
-            dim_head=cfg.hidden_dim,
-            dropout=cfg.drop_rate
-        )
+        self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
+                                     context_dim=cfg.hidden_dim,
+                                     heads=1,
+                                     dim_head=cfg.hidden_dim,
+                                     dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
             nn.BatchNorm2d(cfg.hidden_dim),

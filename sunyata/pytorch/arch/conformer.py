@@ -350,7 +350,7 @@ class Conformer2(Conformer):
             for _ in range(cfg.num_layers)
         ])
         
-        self.conv_block = nn.Sequential(*[
+        self.conv_block = nn.ModuleList([
             ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers // 2)
         ])

@@ -214,16 +214,14 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-        
+        for conv in self.conv_block:
+            x = x + conv(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = latent + self.attn_layers(latent, input)
         # latent = rearrange(latent[:, 1:], 'b (h w) d -> b d h w', h=x.shape[2])
         latent = self.norm(latent)
-
-        for conv in self.conv_block:
-            x = x + conv(x)
 
         for layer in self.layers:
             x = x + layer(x)

@@ -192,7 +192,7 @@ class Conformer(nn.Module):
 
         self.conv_block = nn.ModuleList([
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-            for _ in range(cfg.num_layers // 2)
+            for _ in range(cfg.num_layers )
         ])
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
@@ -214,9 +214,6 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-
-        for conv in self.conv_block:
-            x = x + conv(x)
         
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
@@ -224,6 +221,9 @@ class Conformer(nn.Module):
         latent = latent + self.attn_layers(latent, input)
         # latent = rearrange(latent[:, 1:], 'b (h w) d -> b d h w', h=x.shape[2])
         latent = self.norm(latent)
+
+        for conv in self.conv_block:
+            x = x + conv(x)
 
         for layer in self.layers:
             x = x + layer(x)

@@ -386,7 +386,7 @@ class BayesConvMixer3(ConvMixer):
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         # new add
-        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         # latent = torch.cat([latent, input], dim=1)
 
         latent = latent + self.digup(latent, input)

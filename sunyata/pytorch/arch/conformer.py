@@ -192,7 +192,7 @@ class Conformer(nn.Module):
 
         self.conv_block = nn.ModuleList([
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-            for _ in range(cfg.num_layers )
+            for _ in range(cfg.num_layers)
         ])
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
@@ -217,7 +217,7 @@ class Conformer(nn.Module):
         
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = latent + self.attn_layers(latent, input)
         # latent = rearrange(latent[:, 1:], 'b (h w) d -> b d h w', h=x.shape[2])
         latent = self.norm(latent)
@@ -340,6 +340,26 @@ class Conformer_2(nn.Module):
         # return self.to_logits(latent)
 ### layer 2######################################################
 
+class FCUUp(nn.Module):
+    """ Transformer patch embeddings -> CNN feature maps
+    """
+
+    def __init__(self, hidden_dim, up_stride=1):
+        super(FCUUp, self).__init__()
+
+        self.up_stride = up_stride
+        self.conv_project = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
+        self.bn = nn.BatchNorm2d(hidden_dim)
+        self.act = nn.GELU()
+
+    def forward(self, x, H, W):
+        B, _, C = x.shape
+        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
+        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
+        x_r = self.act(self.bn(self.conv_project(x_r)))
+
+        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
+
 class Conformer2(nn.Module):
     def __init__(self,
                  cfg:ConvMixerCfg):
@@ -348,11 +368,6 @@ class Conformer2(nn.Module):
         self.layers = nn.ModuleList([
             ConvLayer(cfg.hidden_dim, cfg.kernel_size)
             for _ in range(cfg.num_layers)
-        ])
-
-        self.conv_block = self.layers = nn.Sequential(*[
-            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
-            for _ in range(cfg.num_layers // 2)
         ])
 
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
@@ -365,6 +380,17 @@ class Conformer2(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim),
             nn.GELU(),
         )
+
+        self.fcn_up = FCUUp(cfg.hidden_dim, up_stride=1)
+
+        self.conv = ConvLayer(cfg.hidden_dim, cfg.kernel_size)
+
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+        
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
@@ -374,9 +400,7 @@ class Conformer2(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-
-        x = self.conv_block(x)
-        
+        _, _, H, W = x.shape
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -392,8 +416,13 @@ class Conformer2(nn.Module):
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
 
-        latent = reduce(latent, 'b n d -> b d', 'mean')
-        return self.to_logits(latent)
+        x1 = self.fcn_up(latent, H, W)
+        x = self.conv(x + x1)
+        x = self.digup(x)
+
+        # latent = reduce(latent, 'b n d -> b d', 'mean')
+        # return self.to_logits(latent)
+        return x
     
 
 # layer 3 #########################################################

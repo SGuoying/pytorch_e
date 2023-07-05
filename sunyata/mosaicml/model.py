@@ -8,7 +8,7 @@ from torchmetrics.classification import MulticlassAccuracy
 from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg, ViT
 from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Conformer4, Conformer_1, Conformer_2, Convolution
 
-from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixerCat, ConvMixer, BayesConvMixer, ConvMixereca
+from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, BayesConvMixer, ConvMixer3
 from sunyata.pytorch.arch.convnextv2 import ConvNeXtV2
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
@@ -41,6 +41,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = ConvMixer(cfg)
     elif model_name == "convmixer2":
         model = ConvMixer2(cfg)
+    elif model_name == "convmixer3":
+        model = ConvMixer3(cfg)
     elif model_name == "bayes_convmixer":
         model = BayesConvMixer(cfg)
     elif model_name == "bayes_convmixer3":

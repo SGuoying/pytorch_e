@@ -184,11 +184,12 @@ class ConvMixer2(nn.Module):
         return logits
 
   
-class ConvMixereca(ConvMixer):
+class ConvMixer3(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
-        self.layers = nn.ModuleList([
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        super().__init__()
+
+        self.layers = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
@@ -199,28 +200,49 @@ class ConvMixereca(ConvMixer):
             # eps>6.1e-5 to avoid nan in half precision
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
-        self.ecalayer = nn.Sequential(
-            eca_layer(cfg.hidden_dim, kernel_size=cfg.eca_kernel_size),
-            nn.LayerNorm(cfg.hidden_dim),
-            )
 
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1, 1)),
+        #     nn.Flatten(),
+        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        # )
+
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+        self.digup = Attention(query_dim=cfg.hidden_dim,
+                      context_dim=cfg.hidden_dim,
+                      heads=1, 
+                      dim_head=cfg.hidden_dim,
+                      )
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
         self.cfg = cfg
 
     def forward(self, x):
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
+
         x = self.embed(x)
-        logits = self.digup(x)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = latent + self.digup(latent, input)
+        latent = self.logits_layer_norm(latent)
+
         for layer in self.layers:
-            x = x + layer(x)
-            logits = self.digup(x) + logits
-            logits = self.ecalayer(logits)
-        logits = self.fc(logits)
+            x = layer(x)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = latent + self.digup(latent, input)
+            latent = self.logits_layer_norm(latent)
+
+        # x = self.digup(x)
+        # latent = nn.Flatten()(latent)
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        logits = self.fc(latent)
         return logits
 
 class BayesConvMixer(ConvMixer):

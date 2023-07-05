@@ -142,22 +142,47 @@ class ConvMixer2(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
 
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1, 1)),
+        #     nn.Flatten(),
+        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        # )
+
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+        self.digup = Attention(query_dim=cfg.hidden_dim,
+                      context_dim=cfg.hidden_dim,
+                      heads=1, 
+                      dim_head=cfg.hidden_dim,
+                      )
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
         self.cfg = cfg
 
     def forward(self, x):
-        # batch_size, _, _, _ = x.shape
-        # logits = repeat(self.logits, '1 d 1 1 -> b d 1 1', b = batch_size)
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.embed(x)
-        x = self.layers(x)
-        x = self.digup(x)
-        return x
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = latent + self.digup(latent, input)
+        latent = self.logits_layer_norm(latent)
+
+        for layer in self.layers:
+            x = layer(x)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = latent + self.digup(latent, input)
+            latent = self.logits_layer_norm(latent)
+
+        # x = self.digup(x)
+        latent = nn.Flatten()(latent)
+        logits = self.fc(latent)
+        return logits
+
   
 class ConvMixereca(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):

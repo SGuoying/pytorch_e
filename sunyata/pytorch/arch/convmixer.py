@@ -186,7 +186,7 @@ class ConvMixer2(nn.Module):
   
 class ConvMixer3(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
+        super().__init__(cfg)
 
         self.layers = nn.Sequential(*[
             ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)

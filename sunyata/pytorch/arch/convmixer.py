@@ -193,6 +193,11 @@ class ConvMixer3(ConvMixer):
             for _ in range(cfg.num_layers)
         ])
 
+        self.convs = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            for _ in range(cfg.num_layers)
+        ])
+
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
                       stride=cfg.patch_size),
@@ -200,12 +205,6 @@ class ConvMixer3(ConvMixer):
             # eps>6.1e-5 to avoid nan in half precision
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
-
-        # self.digup = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d((1, 1)),
-        #     nn.Flatten(),
-        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        # )
 
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
@@ -225,6 +224,8 @@ class ConvMixer3(ConvMixer):
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.embed(x)
+        x = self.convs(x)
+        
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)

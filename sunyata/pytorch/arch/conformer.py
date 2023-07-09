@@ -473,6 +473,113 @@ class Conformer3(nn.Module):
         latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.to_logits(latent)
 
+class Conformer3_1(nn.Module):
+    def __init__(self,
+                 cfg:ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+
+        self.layers = nn.Sequential(*[
+            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
+            for _ in range(cfg.num_layers)
+        ])
+
+        self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
+                                     context_dim=cfg.hidden_dim,
+                                     heads=1,
+                                     dim_head=cfg.hidden_dim,
+                                     dropout=cfg.drop_rate)
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.GELU(),
+        )
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
+        self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+    def forward(self, x):
+        b, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b=b)
+
+        x = self.embed(x)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # latent = torch.cat([latent, input], dim=1)
+        latent = latent + self.attn_layers(latent, input)
+        latent = self.norm(latent)
+
+        for layer in self.layers:
+            x = layer(x)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = latent + self.attn_layers(latent, input)
+            latent = self.norm(latent)
+
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        return self.to_logits(latent)
+    
+class Conformer3_2(nn.Module):
+    def __init__(self,
+                 cfg:ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+
+        self.layers = nn.Sequential(*[
+            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
+            for _ in range(cfg.num_layers)
+        ])
+
+        # self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
+        #                              context_dim=cfg.hidden_dim,
+        #                              heads=1,
+        #                              dim_head=cfg.hidden_dim,
+        #                              dropout=cfg.drop_rate)
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.GELU(),
+        )
+
+        self.fc = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes),
+        )
+
+        # self.norm = nn.LayerNorm(cfg.hidden_dim)
+        # self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        # self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+    def forward(self, x):
+        # b, _, _, _ = x.shape
+        # latent = repeat(self.latent, 'n d -> b n d', b=b)
+
+        x = self.embed(x)
+        # input = x.permute(0, 2, 3, 1)
+        # input = rearrange(input, 'b ... d -> b (...) d')
+        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        # # latent = torch.cat([latent, input], dim=1)
+        # latent = latent + self.attn_layers(latent, input)
+        # latent = self.norm(latent)
+
+        for layer in self.layers:
+            x = layer(x)
+            # input = x.permute(0, 2, 3, 1)
+            # input = rearrange(input, 'b ... d -> b (...) d')
+            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            # latent = latent + self.attn_layers(latent, input)
+            # latent = self.norm(latent)
+
+        x = self.fc(x)
+
+        # latent = reduce(latent, 'b n d -> b d', 'mean')
+        # return self.to_logits(latent)
+        return x
+    
+
 
 # layer 4 #########################################################
 class transformer(nn.Module):

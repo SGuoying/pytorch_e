@@ -22,18 +22,34 @@ class ConvMixerCfg(BaseCfg):
     skip_connection: bool = True
     eca_kernel_size: int = 3
 
+# class ConvLayer(nn.Sequential):
+#     def __init__(self, hidden_dim, kernel_size, bias=False):
+#         super().__init__(
+#             nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#             nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#         )
 class ConvLayer(nn.Sequential):
     def __init__(self, hidden_dim, kernel_size, bias=False):
         super().__init__(
             nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            
             nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            
         )
 
 class Mlp(nn.Module):
@@ -212,11 +228,6 @@ class Conformer(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
-        self.conv_block = nn.ModuleList([
-            ConvLayer(cfg.hidden_dim, cfg.kernel_size)
-            for _ in range(cfg.num_layers)
-        ])
-
         self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
@@ -224,8 +235,9 @@ class Conformer(nn.Module):
                                      dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
-            nn.BatchNorm2d(cfg.hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            # nn.GELU(),
         )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
@@ -236,11 +248,9 @@ class Conformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-        for conv in self.conv_block:
-            x = x + conv(x)
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         latent = latent + self.attn_layers(latent, input)
         # latent = rearrange(latent[:, 1:], 'b (h w) d -> b d h w', h=x.shape[2])
         latent = self.norm(latent)
@@ -249,7 +259,7 @@ class Conformer(nn.Module):
             x = x + layer(x)
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
-            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
 

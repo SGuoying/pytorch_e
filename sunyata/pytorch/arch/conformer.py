@@ -51,23 +51,44 @@ class Mlp(nn.Module):
         return self.net(x)
 
 
+# class ConvLayer3(nn.Sequential):
+#     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate=0.):
+#         super().__init__(
+           
+#             nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+#             Residual(nn.Sequential(
+#             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2, bias=False),
+#             # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),
+            
+#             nn.Conv2d(hidden_dim, hidden_dim, 1),
+#             nn.BatchNorm2d(hidden_dim),
+#             nn.GELU(),)),
+#         )    
+
 class ConvLayer3(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate=0.):
         super().__init__(
            
             nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.BatchNorm2d(hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            
             Residual(nn.Sequential(
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2, bias=False),
+            nn.GELU(),
             # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
             nn.BatchNorm2d(hidden_dim),
-            nn.GELU(),
+            
             
             nn.Conv2d(hidden_dim, hidden_dim, 1),
+            nn.GELU(),
             nn.BatchNorm2d(hidden_dim),
-            nn.GELU(),)),
-        )    
+            )),
+        ) 
 
 class PreNorm(nn.Module):
     def __init__(self, dim, fn, context_dim = None):
@@ -443,8 +464,9 @@ class Conformer3(nn.Module):
                                      dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
-            nn.BatchNorm2d(cfg.hidden_dim),
             nn.GELU(),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            # nn.GELU(),
         )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)

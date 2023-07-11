@@ -12,7 +12,7 @@ from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, Bay
 from sunyata.pytorch.arch.convnextv2 import ConvNeXtV2
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
-                             loss_name: str = 'cross_entropy',
+                            #  loss_name: str = 'cross_entropy',
                              num_layers: int = 8,
                              hidden_dim: int = 256,
                              patch_size: int = 7,
@@ -111,21 +111,21 @@ def build_composer_convmixer(model_name: str = 'convmixer',
     ])
 
     # Choose loss function: either cross entropy or binary cross entropy
-    if loss_name == 'cross_entropy':
-        loss_fn = soft_cross_entropy
-    elif loss_name == 'binary_cross_entropy':
-        loss_fn = binary_cross_entropy_with_logits
-    else:
-        raise ValueError(
-            f"loss_name='{loss_name}' but must be either ['cross_entropy', 'binary_cross_entropy']"
-        )
+    # if loss_name == 'cross_entropy':
+    #     loss_fn = soft_cross_entropy
+    # elif loss_name == 'binary_cross_entropy':
+    #     loss_fn = binary_cross_entropy_with_logits
+    # else:
+    #     raise ValueError(
+    #         f"loss_name='{loss_name}' but must be either ['cross_entropy', 'binary_cross_entropy']"
+    #     )
 
     # Wrapper function to convert a image classification Pytorch model into a Composer model
     composer_model = ComposerClassifier(
         model,
         train_metrics=train_metrics,
         val_metrics=val_metrics,
-        loss_fn=loss_fn,
+        loss_fn=soft_cross_entropy,
     )
     return composer_model
 # %%

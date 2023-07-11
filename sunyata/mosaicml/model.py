@@ -12,6 +12,7 @@ from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, Bay
 from sunyata.pytorch.arch.convnextv2 import ConvNeXtV2
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
+                             loss_name: str = 'cross_entropy',
                              num_layers: int = 8,
                              hidden_dim: int = 256,
                              patch_size: int = 7,
@@ -85,6 +86,23 @@ def build_composer_convmixer(model_name: str = 'convmixer',
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")
     
+
+
+    # Specify model initialization
+    def weight_init(w: torch.nn.Module):
+        if isinstance(w, torch.nn.Linear) or isinstance(w, torch.nn.Conv2d):
+            torch.nn.init.kaiming_normal_(w.weight)
+        if isinstance(w, torch.nn.BatchNorm2d):
+            w.weight.data = torch.rand(w.weight.data.shape)
+            w.bias.data = torch.zeros_like(w.bias.data)
+        # When using binary cross entropy, set the classification layer bias to -log(num_classes)
+        # to ensure the initial probabilities are approximately 1 / num_classes
+        if loss_name == 'binary_cross_entropy' and isinstance(
+                w, torch.nn.Linear):
+            w.bias.data = torch.ones(
+                w.bias.shape) * -torch.log(torch.tensor(w.bias.shape[0]))
+
+    model.apply(weight_init)
     # Performance metrics to log other than training loss
     train_metrics = MulticlassAccuracy(num_classes=num_classes, average='micro')
     val_metrics = MetricCollection([
@@ -92,12 +110,22 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         MulticlassAccuracy(num_classes=num_classes, average='micro')
     ])
 
+    # Choose loss function: either cross entropy or binary cross entropy
+    if loss_name == 'cross_entropy':
+        loss_fn = soft_cross_entropy
+    elif loss_name == 'binary_cross_entropy':
+        loss_fn = binary_cross_entropy_with_logits
+    else:
+        raise ValueError(
+            f"loss_name='{loss_name}' but must be either ['cross_entropy', 'binary_cross_entropy']"
+        )
+
     # Wrapper function to convert a image classification Pytorch model into a Composer model
     composer_model = ComposerClassifier(
         model,
         train_metrics=train_metrics,
         val_metrics=val_metrics,
-        loss_fn=soft_cross_entropy,
+        loss_fn=loss_fn,
     )
     return composer_model
 # %%

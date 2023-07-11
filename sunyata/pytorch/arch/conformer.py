@@ -155,35 +155,33 @@ class AttnLayer(nn.Module):
         return self.to_out(out)
 
 class AttnLayer2(nn.Module):
-    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+    def __init__(self,
+                 query_dim, context_dim=None,
+                 heads=8, dim_head=64, dropout=0.):
         super().__init__()
-        inner_dim = dim_head *  heads
-        project_out = not (heads == 1 and dim_head == dim)
+        context_dim = context_dim or query_dim
+        inner_dim = dim_head * heads
+        project_out = not (inner_dim == query_dim and heads == 1)
 
         self.heads = heads
         self.scale = dim_head ** -0.5
-
-        self.attend = nn.Softmax(dim = -1)
         self.dropout = nn.Dropout(dropout)
+        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
+        self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias=False)
+        self.to_out = nn.Linear(inner_dim, query_dim) if project_out else nn.Identity()
 
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias = False)
+    def forward(self, x, context=None):
+        h = self.heads
+        q = self.to_q(x)
+        context = context if context is not None else x
+        k, v = self.to_kv(context).chunk(2, dim=-1)
 
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout)
-        ) if project_out else nn.Identity()
-
-    def forward(self, x):
-        qkv = self.to_qkv(x).chunk(3, dim = -1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
-
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
-
-        attn = self.attend(dots)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), (q, k, v))
+        sim = torch.einsum('b i n d, b j n d -> b i j n ', q, k) * self.scale
+        attn = sim.softmax(dim=-1)
         attn = self.dropout(attn)
-
-        out = torch.matmul(attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = torch.einsum('b i j n, b j n d -> b i n d', attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)', h=h)
         return self.to_out(out)
 
 ### layer 0 #######################################
@@ -467,7 +465,7 @@ class Conformer3(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
-        self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
+        self.attn_layers = AttnLayer2(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
                                      dim_head=cfg.hidden_dim,

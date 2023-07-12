@@ -487,6 +487,7 @@ class Conformer3(nn.Module):
             latent = self.norm(latent)
 
         latent = reduce(latent, 'b n d -> b d', 'mean')
+        latent = self.norm(latent)
         return self.to_logits(latent)
 
 class Conformer3_1(nn.Module):

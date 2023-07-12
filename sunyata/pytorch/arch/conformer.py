@@ -52,20 +52,6 @@ class ConvLayer(nn.Sequential):
             
         )
 
-class Mlp(nn.Module):
-    def __init__(self, dim, hidden_dim=None, dropout = 0.):
-        super().__init__()
-        hidden_dim = dim if hidden_dim is None else hidden_dim
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.net(x)
-
 
 class ConvLayer3(nn.Sequential):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate=0.):
@@ -614,11 +600,26 @@ class Conformer3_2(nn.Module):
 
 
 # layer 4 #########################################################
+class Mlp(nn.Module):
+    def __init__(self, dim, hidden_dim=None, dropout = 0.):
+        super().__init__()
+        hidden_dim = dim if hidden_dim is None else hidden_dim
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.net(x)
+    
+
 class transformer(nn.Module):
-    def __init__(self, hidden_dim, heads, dim_head, dropout=0.):
+    def __init__(self, hidden_dim, context_dim, heads, dim_head, dropout=0.):
         super().__init__()
         self.attn = AttnLayer(query_dim=hidden_dim,
-                                context_dim=hidden_dim,
+                                context_dim=context_dim,
                                 heads=heads,
                                 dim_head=dim_head,
                                 dropout=dropout)
@@ -626,12 +627,12 @@ class transformer(nn.Module):
         self.norm1 = nn.LayerNorm(hidden_dim)
         self.norm2 = nn.LayerNorm(hidden_dim)
 
-    def forward(self, x, input):
-        x = x + self.attn(x, input)
-        x = self.norm1(x)
-        x = x + self.mlp(x)
-        x = self.norm2(x)
-        return x
+    def forward(self, latent, input):
+        latent = latent + self.attn(latent, input)
+        latent = self.norm1(latent)
+        latent = latent + self.mlp(latent)
+        latent = self.norm2(latent)
+        return latent
 
 class ConvTransBlock(nn.Module):
     def __init__(self, hidden_dim, kernel_size, heads, dim_head, drop_rate=0.):
@@ -651,23 +652,31 @@ class ConvTransBlock(nn.Module):
 class Conformer4(Conformer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
+        
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
             nn.BatchNorm2d(cfg.hidden_dim),
             nn.GELU(),
         )
+        self.layers = nn.Sequential(*[
+            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
+            for _ in range(cfg.num_layers)
+        ])
 
-        self.layers = nn.ModuleList()
-        for _ in range(cfg.num_layers):
-            self.layers.append(
-                ConvTransBlock(cfg.hidden_dim, 
-                               cfg.kernel_size, 
-                               1, 
-                               cfg.hidden_dim))
+        self.transformer = transformer(hidden_dim=cfg.hidden_dim,
+                                       context_dim=cfg.hidden_dim,
+                                       heads=1,
+                                       dim_head=cfg.hidden_dim,)
 
-        self.attn_layers = transformer(cfg.hidden_dim, 
-                                       1, 
-                                       cfg.hidden_dim,)
+        # self.layers = nn.ModuleList()
+        # for _ in range(cfg.num_layers):
+        #     self.layers.append(
+        #         ConvTransBlock(cfg.hidden_dim, 
+        #                        cfg.kernel_size, 
+        #                        1, 
+        #                        cfg.hidden_dim))
+
+
         # self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
@@ -680,10 +689,14 @@ class Conformer4(Conformer):
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = self.attn_layers(latent, input)
+        latent = self.transformer(latent, input)
 
         for layer in self.layers:
-            x, latent = layer(x, latent)
+            x = layer(x)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = self.transformer(latent, input)
            
         latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.to_logits(latent)

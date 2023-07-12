@@ -506,7 +506,7 @@ class Conformer3_1(nn.Module):
             for _ in range(cfg.num_layers//2)
         ])
 
-        self.attn_layers = AttnLayer2(query_dim=cfg.hidden_dim,
+        self.attn_layers = AttnLayer(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
                                      dim_head=cfg.hidden_dim,

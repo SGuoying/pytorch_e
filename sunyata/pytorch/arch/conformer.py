@@ -26,10 +26,10 @@ class ConvLayer(nn.Sequential):
     def __init__(self, hidden_dim, kernel_size, bias=False):
         super().__init__(
             nn.Conv2d(hidden_dim, hidden_dim//4, 1),
-            nn.BatchNorm2d(hidden_dim),
+            nn.BatchNorm2d(hidden_dim//4),
             nn.GELU(),
             nn.Conv2d(hidden_dim//4, hidden_dim//4, kernel_size, padding=kernel_size // 2, bias=bias),
-            nn.BatchNorm2d(hidden_dim),
+            nn.BatchNorm2d(hidden_dim//4),
             nn.GELU(),
             nn.Conv2d(hidden_dim//4, hidden_dim, 1),
             nn.BatchNorm2d(hidden_dim),

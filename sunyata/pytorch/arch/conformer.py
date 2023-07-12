@@ -22,35 +22,35 @@ class ConvMixerCfg(BaseCfg):
     skip_connection: bool = True
     eca_kernel_size: int = 3
 
+class ConvLayer(nn.Sequential):
+    def __init__(self, hidden_dim, kernel_size, bias=False):
+        super().__init__(
+            nn.Conv2d(hidden_dim, hidden_dim//4, 1),
+            nn.BatchNorm2d(hidden_dim),
+            nn.GELU(),
+            nn.Conv2d(hidden_dim//4, hidden_dim//4, kernel_size, padding=kernel_size // 2, bias=bias),
+            nn.BatchNorm2d(hidden_dim),
+            nn.GELU(),
+            nn.Conv2d(hidden_dim//4, hidden_dim, 1),
+            nn.BatchNorm2d(hidden_dim),
+            nn.GELU(),
+        )
 # class ConvLayer(nn.Sequential):
 #     def __init__(self, hidden_dim, kernel_size, bias=False):
 #         super().__init__(
 #             nn.Conv2d(hidden_dim, hidden_dim, 1),
-#             nn.BatchNorm2d(hidden_dim),
 #             nn.GELU(),
+#             nn.BatchNorm2d(hidden_dim),
+            
 #             nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
-#             nn.BatchNorm2d(hidden_dim),
 #             nn.GELU(),
+#             nn.BatchNorm2d(hidden_dim),
+            
 #             nn.Conv2d(hidden_dim, hidden_dim, 1),
-#             nn.BatchNorm2d(hidden_dim),
 #             nn.GELU(),
+#             nn.BatchNorm2d(hidden_dim),
+            
 #         )
-class ConvLayer(nn.Sequential):
-    def __init__(self, hidden_dim, kernel_size, bias=False):
-        super().__init__(
-            nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.GELU(),
-            nn.BatchNorm2d(hidden_dim),
-            
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size // 2, bias=bias),
-            nn.GELU(),
-            nn.BatchNorm2d(hidden_dim),
-            
-            nn.Conv2d(hidden_dim, hidden_dim, 1),
-            nn.GELU(),
-            nn.BatchNorm2d(hidden_dim),
-            
-        )
 
 
 class ConvLayer3(nn.Sequential):
@@ -219,9 +219,9 @@ class Conformer(nn.Module):
                                      dropout=cfg.drop_rate)
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, cfg.patch_size, stride=cfg.patch_size),
-            nn.GELU(),
-            nn.BatchNorm2d(cfg.hidden_dim),
             # nn.GELU(),
+            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.GELU(),
         )
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)

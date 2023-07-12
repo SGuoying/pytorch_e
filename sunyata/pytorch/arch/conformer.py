@@ -501,6 +501,11 @@ class Conformer3_1(nn.Module):
             for _ in range(cfg.num_layers)
         ])
 
+        self.conv = nn.Sequential(*[
+            ConvLayer3(cfg.hidden_dim, cfg.kernel_size)
+            for _ in range(cfg.num_layers//2)
+        ])
+
         self.attn_layers = AttnLayer2(query_dim=cfg.hidden_dim,
                                      context_dim=cfg.hidden_dim,
                                      heads=1,
@@ -520,10 +525,13 @@ class Conformer3_1(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
+        
+        x = self.conv(x)
+
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = latent[:, :-1, :]
+        # latent = latent[:, :-1, :]
         # latent = torch.cat([latent, input], dim=1)
         latent = latent + self.attn_layers(latent, input)
         latent = self.norm(latent)
@@ -533,11 +541,12 @@ class Conformer3_1(nn.Module):
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            latent = latent[:, :-1, :]
+            # latent = latent[:, :-1, :]
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
 
         latent = reduce(latent, 'b n d -> b d', 'mean')
+        latent = self.norm(latent)
         return self.to_logits(latent)
     
 class Conformer3_2(nn.Module):

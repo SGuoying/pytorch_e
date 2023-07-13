@@ -8,7 +8,7 @@ from torchmetrics.classification import MulticlassAccuracy
 from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg, ViT
 from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Conformer3_1, Conformer3_2, Conformer4, Conformer_1, Conformer_2, Convolution
 
-from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, BayesConvMixer, ConvMixer3
+from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, BayesConvMixer, ConvMixer3, Former
 from sunyata.pytorch.arch.convnextv2 import ConvNeXtV2
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
@@ -80,8 +80,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
 
     elif model_name == "Conformer4":
         model = Conformer4(cfg)
-    elif model_name == "vit":
-        model = ViT(cfg)
+    elif model_name == "Former":
+        model = Former(cfg)
 
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

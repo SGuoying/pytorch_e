@@ -620,3 +620,63 @@ class Former(nn.Module):
         return x
 
 
+class BayesFormer(nn.Module):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
+                      stride=cfg.patch_size),
+            nn.GELU(),
+            # eps>6.1e-5 to avoid nan in half precision
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        )
+
+        layers = []
+        for _ in range(cfg.num_layers):
+            layers.append(
+                formerblock(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+                )
+        self.layers = nn.Sequential(*layers)
+
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+        self.digup = Attention(query_dim=cfg.hidden_dim,
+                      context_dim=cfg.hidden_dim,
+                      heads=1, 
+                      dim_head=cfg.hidden_dim,
+                      )
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+
+        # self.digup = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d((1, 1)),
+        #     nn.Flatten(),
+        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        # )
+
+    def forward(self, x):
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
+
+        x = self.embed(x)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = latent + self.digup(latent, input)
+        latent = self.logits_layer_norm(latent)
+
+        for layer in self.layers:
+            x = layer(x)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = latent + self.digup(latent, input)
+            latent = self.logits_layer_norm(latent)
+
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        # x = self.layers(x)
+        # x = self.digup(x)
+        return self.fc(latent)

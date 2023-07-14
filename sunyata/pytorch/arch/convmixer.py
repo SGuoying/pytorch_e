@@ -536,7 +536,7 @@ class token_mixer(nn.Module):
                                 context_dim=hidden_dim, 
                                 heads=1, 
                                 dim_head=hidden_dim, 
-                                drop_rate=drop_rate)
+                                )
         self.drop = nn.Dropout(drop_rate)
         self.latent = nn.Parameter(torch.randn(1, hidden_dim))
 

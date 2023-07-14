@@ -30,25 +30,25 @@ class eca_layer(nn.Module):
 
 from torch import einsum
 from einops import rearrange, reduce, repeat
-class FCUUp(nn.Module):
-    """ Transformer patch embeddings -> CNN feature maps
-    """
+# class FCUUp(nn.Module):
+#     """ Transformer patch embeddings -> CNN feature maps
+#     """
 
-    def __init__(self, hidden_dim, out_dim, up_stride=1):
-        super(FCUUp, self).__init__()
+#     def __init__(self, hidden_dim, out_dim, up_stride=1):
+#         super(FCUUp, self).__init__()
 
-        self.up_stride = up_stride
-        self.conv_project = nn.Conv2d(hidden_dim, out_dim, kernel_size=1)
-        self.bn = nn.BatchNorm2d(out_dim)
-        self.act = nn.GELU()
+#         self.up_stride = up_stride
+#         self.conv_project = nn.Conv2d(hidden_dim, out_dim, kernel_size=1)
+#         self.bn = nn.BatchNorm2d(out_dim)
+#         self.act = nn.GELU()
 
-    def forward(self, x, H, W):
-        B, _, C = x.shape
-        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
-        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
-        x_r = self.act(self.bn(self.conv_project(x_r)))
+#     def forward(self, x, H, W):
+#         B, _, C = x.shape
+#         # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
+#         x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
+#         x_r = self.act(self.bn(self.conv_project(x_r)))
 
-        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
+#         return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
     
 
 class Attnlayer(nn.Module):
@@ -345,26 +345,6 @@ class CombineConvMixer(ConvMixer):
 
 from einops.layers.torch import Rearrange, Reduce
 
-class FCUUp(nn.Module):
-    """ Transformer patch embeddings -> CNN feature maps
-    """
-
-    def __init__(self, hidden_dim, up_stride=1):
-        super(FCUUp, self).__init__()
-
-        self.up_stride = up_stride
-        self.conv_project = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
-        self.bn = nn.BatchNorm2d(hidden_dim)
-        self.act = nn.GELU()
-
-    def forward(self, x, H, W):
-        B, _, C = x.shape
-        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
-        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
-        x_r = self.act(self.bn(self.conv_project(x_r)))
-
-        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
-    
 
 class BayesConvMixer3(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
@@ -485,6 +465,26 @@ class BayesConvMixer5(ConvMixer):
 
 
 
+class FCUUp(nn.Module):
+    """ Transformer patch embeddings -> CNN feature maps
+    """
+
+    def __init__(self, hidden_dim, up_stride=1):
+        super(FCUUp, self).__init__()
+
+        self.up_stride = up_stride
+        self.conv_project = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
+        self.bn = nn.BatchNorm2d(hidden_dim)
+        self.act = nn.GELU()
+
+    def forward(self, x, H, W):
+        B, _, C = x.shape
+        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
+        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
+        x_r = self.act(self.bn(self.conv_project(x_r)))
+
+        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
+    
 
 class Mlp(nn.Module):
     """
@@ -567,8 +567,6 @@ class formerblock(nn.Module):
 
     def forward(self, x):
         _, _, H, W = x.shape
-        # x = self.norm1(x)
-        # x = self.token_mixer(x)
 
         x = x + self.drop(self.fcup( self.token_mixer(self.norm1(x))), H, W)
         x = x + self.drop(self.mlp(self.norm2(x)))

@@ -97,9 +97,9 @@ class Attnlayer(nn.Module):
         out = torch.einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
         out = self.to_out(out)
-        latent = out
+        # latent = out
         context = self.fcup(out, H, W)
-        return latent, context
+        return context
 @dataclass
 class ConvMixerCfg(BaseCfg):
     num_layers: int = 8
@@ -546,7 +546,7 @@ class token_mixer(nn.Module):
 
         x = self.layer1(x)
         x = self.drop(x)
-        x = self.layer2(latent, x)
+        x = self.layer2(latent, x) + x
         x = self.drop(x)
         return x
     

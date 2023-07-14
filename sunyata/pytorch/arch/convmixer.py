@@ -530,13 +530,14 @@ class token_mixer(nn.Module):
             nn.BatchNorm2d(hidden_dim), 
             # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
-        self.layer2 = Attnlayer(query_dim=hidden_dim, 
+        self.layer2 = Attention(query_dim=hidden_dim, 
                                 context_dim=hidden_dim, 
                                 heads=1, 
                                 dim_head=hidden_dim, 
                                 )
         self.drop = nn.Dropout(drop_rate)
         self.latent = nn.Parameter(torch.randn(1, hidden_dim))
+        self.norm = nn.LayerNorm(hidden_dim)
 
     def forward(self, x):
         batch_size, _, _, _ = x.shape
@@ -544,9 +545,12 @@ class token_mixer(nn.Module):
 
         x = self.layer1(x)
         x = self.drop(x)
-        x = self.layer2(latent, x) + x
-        x = self.drop(x)
-        return x
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = latent + self.attn_layers(latent, input)
+        latent = self.norm(latent)
+        return latent
     
 class formerblock(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
@@ -557,10 +561,16 @@ class formerblock(nn.Module):
         self.norm2 = nn.BatchNorm2d(hidden_dim)
         self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*4, drop=drop_rate)
 
+        self.fcup = FCUUp(hidden_dim, hidden_dim)
+
         self.drop = nn.Dropout(drop_rate) if drop_rate > 0. else nn.Identity()
 
     def forward(self, x):
-        x = x + self.drop(self.token_mixer(self.norm1(x)))
+        _, _, H, W = x.shape
+        # x = self.norm1(x)
+        # x = self.token_mixer(x)
+
+        x = x + self.drop(self.fcup( self.token_mixer(self.norm1(x))), H, W)
         x = x + self.drop(self.mlp(self.norm2(x)))
         return x
     

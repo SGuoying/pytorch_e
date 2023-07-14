@@ -139,6 +139,7 @@ class ViT(nn.Module):
             nn.LayerNorm(cfg.hidden_dim),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
+        self.cfg = cfg
 
     def forward(self, img):
         x = self.to_patch_embedding(img)

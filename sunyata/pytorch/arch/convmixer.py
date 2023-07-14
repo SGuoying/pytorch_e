@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, ecablock
+from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, Residual, ecablock
 from sunyata.pytorch.layer.attention import Attention, AttentionWithoutParams, EfficientChannelAttention
 
 
@@ -30,72 +30,28 @@ class eca_layer(nn.Module):
 
 from torch import einsum
 from einops import rearrange, reduce, repeat
-def exists(val):
-    return val is not None
+class FCUUp(nn.Module):
+    """ Transformer patch embeddings -> CNN feature maps
+    """
 
-def default(val, d):
-    return val if exists(val) else d
+    def __init__(self, hidden_dim, out_dim, up_stride=1):
+        super(FCUUp, self).__init__()
 
-# class Attention(nn.Module):
-#     def __init__(self, query_dim, context_dim = None, heads = 8, dim_head = 32, dropout = 0.):
-#         super().__init__()
-#         inner_dim = dim_head * heads
-#         context_dim = default(context_dim, query_dim)
+        self.up_stride = up_stride
+        self.conv_project = nn.Conv2d(hidden_dim, out_dim, kernel_size=1)
+        self.bn = nn.BatchNorm2d(out_dim)
+        self.act = nn.GELU()
 
-#         self.scale = dim_head ** -0.5
-#         self.heads = heads
+    def forward(self, x, H, W):
+        B, _, C = x.shape
+        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
+        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
+        x_r = self.act(self.bn(self.conv_project(x_r)))
 
-#         self.to_q = nn.Linear(query_dim, inner_dim, bias = False)
-#         self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias = False)
-
-#         self.dropout = nn.Dropout(dropout)
-#         self.to_out = nn.Linear(inner_dim, query_dim)
-
-#     def forward(self, x, context = None):
-#         # x: [B, C, h, w]
-#         # x = x.flatten(2).transpose(1, 2)  # [B, HW, C]
-#         h = self.heads
-
-#         q = self.to_q(x)
-#         context = default(context, x)
-#         k, v = self.to_kv(context).chunk(2, dim = -1)
-
-#         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h = h), (q, k, v))
-
-#         sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
-
-#         # attention, what we cannot get enough of
-#         attn = sim.softmax(dim = -1)
-#         attn = self.dropout(attn)
-
-#         out = einsum('b i j, b j d -> b i d', attn, v)
-#         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
-#         out = self.to_out(out)  # [B, HW, C]
-#         return out
+        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
+    
 
 class Attnlayer(nn.Module):
-    """
-    Cross Attention modified from Perceiver.
-
-    Three dimensions:
-    - query_dim (or latent_dim): dim of the latent space
-    - context_dim: dim of the input space
-    - inner_dim: dim of the inner space of attention, equal to dim_head * heads
-
-    Two inputs:
-    - x: input from the latent space, with shape (latent, query_dim)
-    - context: input from the input space, with shape (input, context_dim)
-
-    Data flow:
-    x(latent, query_dim) -- Linear(query_dim, inner_dim) --> q(latent, inner_dim)
-    context(input, context_dim) -- nn.Linear(context_dim, inner_dim * 2) --> k,v(input, inner_dim)
-    q(latent, inner_dim) * k(input, inner_dim) --> sim(latent, input) -- softmax(dim=-1) -->
-    attn(latent, input) * v(input, inner_dim) --> 
-    out(latent, inner_dim) -- Linear(inner_dim, query_dim) --> out(latent, query_dim)
-
-    Refs:
-    https://github.com/lucidrains/perceiver-pytorch/
-    """
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
 
         super().__init__()
@@ -112,13 +68,24 @@ class Attnlayer(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim) if project_out else nn.Identity()
+        self.fcup = FCUUp(query_dim,query_dim, up_stride=1)
 
-    def forward(self, x, context = None):
+    def forward(self, latent, context = None):
         h = self.heads
+        # context (b c h w) --> (b h*w c)
+        assert context.ndim == 4
+        B, C, H, W = context.shape
+        input = context.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+        latent = latent = latent[:, :-1, :]
+        # context = input
 
-        q = self.to_q(x)
-        context = context if context is not None else x
-        k, v = self.to_kv(context).chunk(2, dim=-1)
+        q = self.to_q(latent)
+        # context = context if context is not None else latent
+        # k, v = self.to_kv(context).chunk(2, dim=-1)
+        # context = context if context is not None else latent
+        k, v = self.to_kv(input).chunk(2, dim=-1)
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q,k,v))
 
@@ -130,7 +97,9 @@ class Attnlayer(nn.Module):
         out = torch.einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
         out = self.to_out(out)
-        return out
+        latent = out
+        context = self.fcup(out, H, W)
+        return latent, context
 @dataclass
 class ConvMixerCfg(BaseCfg):
     num_layers: int = 8
@@ -553,21 +522,31 @@ class token_mixer(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__()
         self.layer1 = nn.Sequential(
+            Residual(nn.Sequential(
                 nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim),
-            )
-        self.layer2 = nn.Sequential(
+            )),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim), 
+            # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
+        self.layer2 = Attnlayer(query_dim=hidden_dim, 
+                                context_dim=hidden_dim, 
+                                heads=1, 
+                                dim_head=hidden_dim, 
+                                drop_rate=drop_rate)
         self.drop = nn.Dropout(drop_rate)
+        self.latent = nn.Parameter(torch.randn(1, hidden_dim))
 
     def forward(self, x):
-        x = self.layer1(x) + x
+        batch_size, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
+
+        x = self.layer1(x)
         x = self.drop(x)
-        x = self.layer2(x)
+        x = self.layer2(latent, x)
         x = self.drop(x)
         return x
     

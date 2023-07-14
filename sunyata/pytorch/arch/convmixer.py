@@ -568,7 +568,7 @@ class formerblock(nn.Module):
     def forward(self, x):
         _, _, H, W = x.shape
 
-        x = x + self.drop(self.fcup( self.token_mixer(self.norm1(x))), H, W)
+        x = x + self.drop(self.fcup(self.token_mixer(self.norm1(x)), H, W))
         x = x + self.drop(self.mlp(self.norm2(x)))
         return x
     

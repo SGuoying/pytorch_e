@@ -68,7 +68,7 @@ class Attnlayer(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim) if project_out else nn.Identity()
-        self.fcup = FCUUp(query_dim,query_dim, up_stride=1)
+        self.fcup = FCUUp(query_dim, query_dim,)
 
     def forward(self, latent, context = None):
         h = self.heads
@@ -250,8 +250,6 @@ class ConvMixer3(ConvMixer):
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.embed(x)
-        x = self.convs(x)
-        
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)

@@ -30,26 +30,7 @@ class eca_layer(nn.Module):
 
 from torch import einsum
 from einops import rearrange, reduce, repeat
-# class FCUUp(nn.Module):
-#     """ Transformer patch embeddings -> CNN feature maps
-#     """
 
-#     def __init__(self, hidden_dim, out_dim, up_stride=1):
-#         super(FCUUp, self).__init__()
-
-#         self.up_stride = up_stride
-#         self.conv_project = nn.Conv2d(hidden_dim, out_dim, kernel_size=1)
-#         self.bn = nn.BatchNorm2d(out_dim)
-#         self.act = nn.GELU()
-
-#     def forward(self, x, H, W):
-#         B, _, C = x.shape
-#         # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
-#         x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
-#         x_r = self.act(self.bn(self.conv_project(x_r)))
-
-#         return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
-    
 
 class Attnlayer(nn.Module):
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
@@ -209,7 +190,28 @@ class ConvMixer2(nn.Module):
         logits = self.fc(latent)
         return logits
 
-  
+
+class FCUUp(nn.Module):
+    """ Transformer patch embeddings -> CNN feature maps
+    """
+
+    def __init__(self, hidden_dim, up_stride=1):
+        super(FCUUp, self).__init__()
+
+        self.up_stride = up_stride
+        self.conv_project = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
+        self.bn = nn.BatchNorm2d(hidden_dim)
+        self.act = nn.GELU()
+
+    def forward(self, x, H, W):
+        B, _, C = x.shape
+        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
+        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
+        x_r = self.act(self.bn(self.conv_project(x_r)))
+
+        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
+    
+
 class ConvMixer3(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
@@ -221,7 +223,7 @@ class ConvMixer3(ConvMixer):
 
         self.convs = nn.Sequential(*[
             ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
+            for _ in range(cfg.num_layers // 2)
         ])
 
         self.embed = nn.Sequential(
@@ -231,6 +233,7 @@ class ConvMixer3(ConvMixer):
             # eps>6.1e-5 to avoid nan in half precision
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
+        self.fcn_up = FCUUp(cfg.hidden_dim, up_stride=1)
 
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
@@ -240,7 +243,12 @@ class ConvMixer3(ConvMixer):
                       dim_head=cfg.hidden_dim,
                       )
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.fc = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
         self.cfg = cfg
@@ -250,6 +258,7 @@ class ConvMixer3(ConvMixer):
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.embed(x)
+        _, _, H, W = x.shape
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -263,11 +272,14 @@ class ConvMixer3(ConvMixer):
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.digup(latent, input)
             latent = self.logits_layer_norm(latent)
+        
+        x1 = self.fcn_up(latent, H, W)
+        x = self.convs(x + x1)
 
         # x = self.digup(x)
         # latent = nn.Flatten()(latent)
-        latent = reduce(latent, 'b n d -> b d', 'mean')
-        logits = self.fc(latent)
+        # latent = reduce(latent, 'b n d -> b d', 'mean')
+        logits = self.fc(x)
         return logits
 
 class BayesConvMixer(ConvMixer):
@@ -464,28 +476,6 @@ class BayesConvMixer5(ConvMixer):
         return logits
 
 
-
-class FCUUp(nn.Module):
-    """ Transformer patch embeddings -> CNN feature maps
-    """
-
-    def __init__(self, hidden_dim, up_stride=1):
-        super(FCUUp, self).__init__()
-
-        self.up_stride = up_stride
-        self.conv_project = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
-        self.bn = nn.BatchNorm2d(hidden_dim)
-        self.act = nn.GELU()
-
-    def forward(self, x, H, W):
-        B, _, C = x.shape
-        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
-        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
-        x_r = self.act(self.bn(self.conv_project(x_r)))
-
-        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
-    
-
 class Mlp(nn.Module):
     """
     Implementation of MLP with 1*1 convolutions.
@@ -605,63 +595,3 @@ class Former(nn.Module):
         return x
 
 
-class BayesFormer(nn.Module):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
-        self.cfg = cfg
-
-        self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
-            nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
-        )
-
-        layers = []
-        for _ in range(cfg.num_layers):
-            layers.append(
-                formerblock(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-                )
-        self.layers = nn.Sequential(*layers)
-
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
-        self.digup = Attention(query_dim=cfg.hidden_dim,
-                      context_dim=cfg.hidden_dim,
-                      heads=1, 
-                      dim_head=cfg.hidden_dim,
-                      )
-        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
-        # self.digup = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d((1, 1)),
-        #     nn.Flatten(),
-        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        # )
-
-    def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
-
-        x = self.embed(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = latent + self.digup(latent, input)
-        latent = self.logits_layer_norm(latent)
-
-        for layer in self.layers:
-            x = layer(x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            latent = latent + self.digup(latent, input)
-            latent = self.logits_layer_norm(latent)
-
-        latent = reduce(latent, 'b n d -> b d', 'mean')
-        # x = self.layers(x)
-        # x = self.digup(x)
-        return self.fc(latent)

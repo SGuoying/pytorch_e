@@ -530,7 +530,7 @@ class token_mixer(nn.Module):
             nn.BatchNorm2d(hidden_dim), 
             # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
-        self.layer2 = Attention(query_dim=hidden_dim, 
+        self.attn_layers = Attention(query_dim=hidden_dim, 
                                 context_dim=hidden_dim, 
                                 heads=1, 
                                 dim_head=hidden_dim, 

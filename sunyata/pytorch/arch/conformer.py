@@ -526,7 +526,6 @@ class Conformer3_1(nn.Module):
         input = rearrange(input, 'b ... d -> b (...) d')
         # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
         # latent = latent[:, :-1, :]
-        # latent = torch.cat([latent, input], dim=1)
         latent = latent + self.attn_layers(latent, input)
         latent = self.norm(latent)
 

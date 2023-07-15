@@ -520,6 +520,7 @@ class token_mixer(nn.Module):
             nn.BatchNorm2d(hidden_dim), 
             # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
+        
         self.attn_layers = Attention(query_dim=hidden_dim, 
                                 context_dim=hidden_dim, 
                                 heads=1, 
@@ -542,23 +543,37 @@ class token_mixer(nn.Module):
         latent = self.norm(latent)
         return latent
     
-class formerblock(nn.Module):
+class conv_mixer(nn.Module):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
+        super().__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim), 
+            # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
+        )
+
+    def forward(self, x):
+        x = self.layer1(x)
+        return x
+
+    
+class block(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__()
         self.norm1 = nn.BatchNorm2d(hidden_dim)
 
-        self.token_mixer = token_mixer(hidden_dim, kernel_size, drop_rate)
+        self.token_mixer = conv_mixer(hidden_dim, kernel_size, drop_rate)
         self.norm2 = nn.BatchNorm2d(hidden_dim)
         self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*4, drop=drop_rate)
-
-        self.fcup = FCUUp(hidden_dim, hidden_dim)
 
         self.drop = nn.Dropout(drop_rate) if drop_rate > 0. else nn.Identity()
 
     def forward(self, x):
-        _, _, H, W = x.shape
-
-        x = x + self.drop(self.fcup(self.token_mixer(self.norm1(x)), H, W))
+        x = x + self.drop(self.token_mixer(self.norm1(x)))
         x = x + self.drop(self.mlp(self.norm2(x)))
         return x
     
@@ -578,7 +593,7 @@ class Former(nn.Module):
         layers = []
         for _ in range(cfg.num_layers):
             layers.append(
-                formerblock(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+                block(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
                 )
         self.layers = nn.Sequential(*layers)
 

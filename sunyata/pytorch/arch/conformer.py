@@ -82,7 +82,7 @@ class ConvLayer3(nn.Sequential):
             
             Residual(nn.Sequential(
             # nn.Conv2d(hidden_dim, hidden_dim, kernel_size, padding=kernel_size//2, bias=False),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same",bias=False),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim),
             

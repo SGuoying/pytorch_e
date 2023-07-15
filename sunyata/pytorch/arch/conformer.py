@@ -86,7 +86,6 @@ class ConvLayer3(nn.Sequential):
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim),
             
-            
             nn.Conv2d(hidden_dim, hidden_dim, 1),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim),

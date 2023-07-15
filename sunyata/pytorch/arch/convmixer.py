@@ -568,7 +568,7 @@ class block(nn.Module):
 
         self.token_mixer = conv_mixer(hidden_dim, kernel_size, drop_rate)
         self.norm2 = nn.BatchNorm2d(hidden_dim)
-        self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*4, drop=drop_rate)
+        self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*2, drop=drop_rate)
 
         self.drop = nn.Dropout(drop_rate) if drop_rate > 0. else nn.Identity()
 

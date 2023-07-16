@@ -569,9 +569,11 @@ class conv_mixer(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__()
         self.layer1 = nn.Sequential(
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
-            nn.GELU(),
-            nn.BatchNorm2d(hidden_dim),
+            Residual(nn.Sequential(
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
+                nn.GELU(),
+                nn.BatchNorm2d(hidden_dim),
+            )),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
             nn.GELU(),
             nn.BatchNorm2d(hidden_dim), 
@@ -648,8 +650,8 @@ class bayesFormer(nn.Module):
         self.layers = nn.ModuleList([])
         for _ in range(cfg.num_layers):
             self.layers.append(nn.ModuleList([
-                PreNorm(cfg.hidden_dim, conv_mixer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate), nn.BatchNorm2d),
-                PreNorm(cfg.hidden_dim, FeedForward(cfg.hidden_dim, cfg.hidden_dim*2,))
+                PreNorm(cfg.hidden_dim, conv_mixer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate), nn.Identity),
+                PreNorm(cfg.hidden_dim, FeedForward(cfg.hidden_dim, cfg.hidden_dim*4))
             ])
                 )
         
@@ -668,7 +670,7 @@ class bayesFormer(nn.Module):
         logits = self.digup(x)
 
         for conv, mlp in self.layers:
-            x = conv(x) + x
+            x = conv(x)
             logits = logits + self.digup(x)
             # logits = self.norm(logits)
             logits = mlp(logits) + logits

@@ -505,7 +505,29 @@ class Mlp(nn.Module):
         x = self.fc2(x)
         x = self.drop(x)
         return x
+
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn, norm_layer = nn.LayerNorm):
+        super().__init__()
+        self.norm = norm_layer(dim)
+        self.fn = fn
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
     
+
+class FeedForward(nn.Module):
+    def __init__(self, dim, hidden_dim, dropout = 0.):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.net(x)
 class token_mixer(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__()
@@ -623,12 +645,14 @@ class bayesFormer(nn.Module):
             nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
         )
 
-        layers = []
+        self.layers = nn.ModuleList([])
         for _ in range(cfg.num_layers):
-            layers.append(
-                block(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+            self.layers.append(nn.ModuleList([
+                PreNorm(cfg.hidden_dim, conv_mixer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate), nn.BatchNorm2d),
+                PreNorm(cfg.hidden_dim, FeedForward(cfg.hidden_dim, cfg.hidden_dim*2,))
+            ])
                 )
-        self.layers = nn.Sequential(*layers)
+        
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -643,10 +667,11 @@ class bayesFormer(nn.Module):
         x = self.embed(x)
         logits = self.digup(x)
 
-        for layer in self.layers:
-            x = layer(x)
+        for conv, mlp in self.layers:
+            x = conv(x) + x
             logits = logits + self.digup(x)
-            logits = self.norm(logits)
+            # logits = self.norm(logits)
+            logits = mlp(logits) + logits
         logits = self.fc(logits)
         return logits
 

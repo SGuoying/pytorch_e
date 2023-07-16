@@ -608,5 +608,46 @@ class Former(nn.Module):
         x = self.layers(x)
         x = self.digup(x)
         return x
+    
+
+class bayesFormer(nn.Module):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+
+        self.embed = nn.Sequential(
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
+                      stride=cfg.patch_size),
+            nn.GELU(),
+            # eps>6.1e-5 to avoid nan in half precision
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+        )
+
+        layers = []
+        for _ in range(cfg.num_layers):
+            layers.append(
+                block(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+                )
+        self.layers = nn.Sequential(*layers)
+
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+        self.fc =  nn.Linear(cfg.hidden_dim, cfg.num_classes)
+
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
+
+    def forward(self, x):
+        x = self.embed(x)
+        logits = self.digup(x)
+
+        for layer in self.layers:
+            x = layer(x)
+            logits = logits + self.digup(x)
+            logits = self.norm(logits)
+        logits = self.fc(logits)
+        return logits
 
 

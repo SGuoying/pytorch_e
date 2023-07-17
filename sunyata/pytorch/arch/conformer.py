@@ -463,13 +463,6 @@ class Conformer3(nn.Module):
             # nn.GELU(),
         )
 
-        self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes),
-        )
-        self.fcn_up = FCUUp(cfg.hidden_dim, up_stride=1)
-
         self.norm = nn.LayerNorm(cfg.hidden_dim)
         self.to_logits = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
@@ -479,7 +472,6 @@ class Conformer3(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.embed(x)
-        _, _, H, W = x.shape
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -494,12 +486,10 @@ class Conformer3(nn.Module):
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
-            
-        latent = self.fcn_up(latent, H, W)
 
-        # latent = reduce(latent, 'b n d -> b d', 'mean')
-        # return self.to_logits(latent)
-        return self.fc(latent)
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        return self.to_logits(latent)
+
 
 class Conformer3_1(nn.Module):
     def __init__(self,

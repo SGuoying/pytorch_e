@@ -495,11 +495,11 @@ class Conformer3(nn.Module):
             latent = latent + self.attn_layers(latent, input)
             latent = self.norm(latent)
             
-        x = self.fcn_up(latent, H, W)
+        latent = self.fcn_up(latent, H, W)
 
         # latent = reduce(latent, 'b n d -> b d', 'mean')
         # return self.to_logits(latent)
-        return self.fc(x)
+        return self.fc(latent)
 
 class Conformer3_1(nn.Module):
     def __init__(self,

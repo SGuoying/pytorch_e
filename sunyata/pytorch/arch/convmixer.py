@@ -104,8 +104,13 @@ class ConvMixer(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
 
-        self.layers = nn.ModuleList([
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        # self.layers = nn.ModuleList([
+        #     ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        #     for _ in range(cfg.num_layers)
+        # ])
+        
+        self.layers = nn.Sequential(*[
+            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
@@ -113,8 +118,7 @@ class ConvMixer(nn.Module):
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
                       stride=cfg.patch_size),
             nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+            nn.BatchNorm2d(cfg.hidden_dim),
         )
 
         self.digup = nn.Sequential(
@@ -127,8 +131,7 @@ class ConvMixer(nn.Module):
 
     def forward(self, x):
         x = self.embed(x)
-        for layer in self.layers:
-            x = x + layer(x)
+        x = self.layers(x)
         x = self.digup(x)
         return x
 
@@ -221,19 +224,12 @@ class ConvMixer3(ConvMixer):
             for _ in range(cfg.num_layers)
         ])
 
-        self.convs = nn.Sequential(*[
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers // 2)
-        ])
-
         self.embed = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
                       stride=cfg.patch_size),
             nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
+            nn.BatchNorm2d(cfg.hidden_dim),
         )
-        self.fcn_up = FCUUp(cfg.hidden_dim, up_stride=1)
 
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
@@ -244,11 +240,8 @@ class ConvMixer3(ConvMixer):
                       )
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        
         self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
         self.cfg = cfg
@@ -258,7 +251,6 @@ class ConvMixer3(ConvMixer):
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.embed(x)
-        _, _, H, W = x.shape
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
         latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
@@ -272,15 +264,9 @@ class ConvMixer3(ConvMixer):
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.digup(latent, input)
             latent = self.logits_layer_norm(latent)
-        
-        x1 = self.fcn_up(latent, H, W)
-        x = self.convs(x + x1)
 
-        # x = self.digup(x)
-        # latent = nn.Flatten()(latent)
-        # latent = reduce(latent, 'b n d -> b d', 'mean')
-        logits = self.fc(x)
-        return logits
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        return self.fc(latent)
 
 class BayesConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):

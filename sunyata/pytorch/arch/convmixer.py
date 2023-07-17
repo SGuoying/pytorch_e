@@ -572,16 +572,17 @@ class conv_mixer(nn.Module):
             Residual(nn.Sequential(
                 nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
                 nn.GELU(),
-                nn.BatchNorm2d(hidden_dim),
+                nn.GroupNorm(hidden_dim),
             )),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
             nn.GELU(),
-            nn.BatchNorm2d(hidden_dim), 
+            nn.GroupNorm(hidden_dim), 
             # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
 
     def forward(self, x):
         x = self.layer1(x)
+ 
         return x
 
     
@@ -674,6 +675,8 @@ class bayesFormer(nn.Module):
             logits = logits + self.digup(x)
             # logits = self.norm(logits)
             logits = mlp(logits) + logits
+
+        logits = self.norm(logits)
         logits = self.fc(logits)
         return logits
 

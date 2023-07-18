@@ -558,12 +558,12 @@ class conv_mixer(nn.Module):
             Residual(nn.Sequential(
                 nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
                 nn.GELU(),
-                nn.GroupNorm(hidden_dim),
+                # nn.BatchNorm2d(hidden_dim),
                 ecablock(hidden_dim, kernel_size,)
             )),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
-            nn.GELU(),
-            nn.GroupNorm(hidden_dim), 
+            # nn.GELU(),
+            # nn.BatchNorm2d(hidden_dim), 
             # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
         )
 

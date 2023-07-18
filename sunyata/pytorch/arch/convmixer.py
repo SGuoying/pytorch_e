@@ -618,9 +618,17 @@ class Former(nn.Module):
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
 
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
+
     def forward(self, x):
         x = self.embed(x)
-        x = self.layers(x)
+        b, _, h, w = x.shape
+        for layer in self.layers:
+            x = layer(x)
+            x = x.flatten(2).transpose(1, 2)
+            x = self.norm(x)
+            x = x.reshape(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
+
         x = self.digup(x)
         return x
     

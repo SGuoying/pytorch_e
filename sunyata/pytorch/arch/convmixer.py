@@ -473,7 +473,7 @@ class Mlp(nn.Module):
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
         self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
-        self.dw = nn.Conv2d(hidden_features, hidden_features, 3, groups=hidden_features)
+        self.dw = nn.Conv2d(hidden_features, hidden_features, 3, groups=hidden_features, padding=1)
         self.act = nn.GELU()
         self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
         self.drop = nn.Dropout(drop)

@@ -473,6 +473,7 @@ class Mlp(nn.Module):
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
         self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
+        self.dw = nn.Conv2d(hidden_features, hidden_features, 3, groups=hidden_features)
         self.act = nn.GELU()
         self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
         self.drop = nn.Dropout(drop)
@@ -486,6 +487,7 @@ class Mlp(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
+        x = self.dw(x)
         x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x)
@@ -554,33 +556,30 @@ class token_mixer(nn.Module):
 class conv_mixer(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__()
-        self.layer1 = nn.Sequential(
-            Residual(nn.Sequential(
-                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
-                nn.GELU(),
-                # nn.BatchNorm2d(hidden_dim),
-                ecablock(hidden_dim, kernel_size,)
-            )),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
-            # nn.GELU(),
-            # nn.BatchNorm2d(hidden_dim), 
-            # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
-        )
+        self.conv1 = nn.Conv2d(hidden_dim, hidden_dim, 1)
+        self.act = nn.GELU()
+        self.eca = ecablock(hidden_dim, kernel_size)
+        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, 1)
 
     def forward(self, x):
-        x = self.layer1(x)
+        clone = x.clone()
+        x = self.conv1(x)
+        x = self.act(x)
+        x = self.eca(x)
+        x = self.conv2(x)
+        x = x + clone
  
         return x
 
     
 class block(nn.Module):
-    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
+    def __init__(self, hidden_dim: int, kernel_size: int, mlp_ratp: int, drop_rate: float=0.):
         super().__init__()
         self.norm1 = nn.BatchNorm2d(hidden_dim)
 
         self.token_mixer = conv_mixer(hidden_dim, kernel_size, drop_rate)
         self.norm2 = nn.BatchNorm2d(hidden_dim)
-        self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*2, drop=drop_rate)
+        self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*mlp_ratp, drop=drop_rate)
 
         self.drop = nn.Dropout(drop_rate) if drop_rate > 0. else nn.Identity()
 
@@ -605,7 +604,7 @@ class Former(nn.Module):
         layers = []
         for _ in range(cfg.num_layers):
             layers.append(
-                block(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+                block(cfg.hidden_dim, cfg.kernel_size, 4, cfg.drop_rate)
                 )
         self.layers = nn.Sequential(*layers)
 

@@ -231,7 +231,7 @@ class ConvMixer3(ConvMixer):
             nn.BatchNorm2d(cfg.hidden_dim),
         )
 
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+        # self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
 
         self.digup = Attention(query_dim=cfg.hidden_dim,
                       context_dim=cfg.hidden_dim,
@@ -559,6 +559,7 @@ class conv_mixer(nn.Module):
                 nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
                 nn.GELU(),
                 nn.GroupNorm(hidden_dim),
+                ecablock(hidden_dim, kernel_size,)
             )),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
             nn.GELU(),

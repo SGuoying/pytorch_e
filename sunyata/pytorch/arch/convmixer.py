@@ -473,7 +473,7 @@ class Mlp(nn.Module):
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
         self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
-        self.dw = nn.Conv2d(hidden_features, hidden_features, 3, groups=hidden_features, padding=1)
+        # self.dw = nn.Conv2d(hidden_features, hidden_features, 3, groups=hidden_features, padding=1)
         self.act = nn.GELU()
         self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
         self.drop = nn.Dropout(drop)
@@ -487,7 +487,7 @@ class Mlp(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
-        x = self.dw(x)
+        # x = self.dw(x)
         x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x)
@@ -557,15 +557,19 @@ class conv_mixer(nn.Module):
     def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
         super().__init__()
         self.conv1 = nn.Conv2d(hidden_dim, hidden_dim, 1)
+        self.dw = nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same")
         self.act = nn.GELU()
         self.eca = ecablock(hidden_dim, kernel_size)
         self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, 1)
+        self.act2 = nn.GELU()
 
     def forward(self, x):
         clone = x.clone()
         x = self.conv1(x)
         x = self.act(x)
+        x = self.dw(x)
         x = self.eca(x)
+        x = self.act2(x)
         x = self.conv2(x)
         x = x + clone
  

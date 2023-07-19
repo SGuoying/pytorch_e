@@ -189,7 +189,7 @@ class Convformer(nn.Module):
         self.stage2 = nn.ModuleList([
             self.conv2,
             transformer(hidden_dim=self.hidden_dim[1],
-                                 mlp_rate=cfg.mlp_rate,
+                                 mlp_rate=4,
                                  kernel_size=cfg.kernel_size,
                                  drop_rate=cfg.drop_rate)
         ])
@@ -208,7 +208,7 @@ class Convformer(nn.Module):
         self.stage3 = nn.ModuleList([
             self.conv3,
             transformer(hidden_dim=self.hidden_dim[2],
-                                 mlp_rate=cfg.mlp_rate,
+                                 mlp_rate=4,
                                  kernel_size=cfg.kernel_size,
                                  drop_rate=cfg.drop_rate)
         ])

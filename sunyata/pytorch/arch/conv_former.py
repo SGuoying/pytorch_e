@@ -230,7 +230,7 @@ class Convformer(nn.Module):
             x = conv(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
-            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
             latent = transformer(latent, context=context) + latent
             B, _, C = latent.shape
             # latent = self.norm(latent)
@@ -242,7 +242,7 @@ class Convformer(nn.Module):
             x = conv(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
-            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
             latent = transformer(latent, context=context) + latent
             B, _, C = latent.shape
             # latent = self.norm(latent)
@@ -254,7 +254,7 @@ class Convformer(nn.Module):
             x = conv(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
-            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
+            latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
             latent = transformer(latent, context=context) + latent
             latent = self.norm(latent)
         # x = latent[:, 1:].transpose(1, 2).reshape(B, C, H, W)

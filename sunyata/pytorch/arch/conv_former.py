@@ -170,7 +170,7 @@ class Convformer(nn.Module):
         self.stage1 = nn.ModuleList([
             self.conv1,
             transformer(hidden_dim=self.hidden_dim[0],
-                                 mlp_rate=cfg.mlp_rate,
+                                 mlp_rate=4,
                                  kernel_size=cfg.kernel_size,
                                  drop_rate=cfg.drop_rate)
         ])

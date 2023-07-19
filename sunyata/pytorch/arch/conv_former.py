@@ -176,6 +176,7 @@ class Convformer(nn.Module):
 
         #  stage 2 **********************************************
         self.patch_embed2 = PatchEmbed(in_channels=self.hidden_dim[0], hidden_dim=self.hidden_dim[1], patch_size=self.patch_size[1])
+        self.up1 = nn.Linear(self.hidden_dim[0], self.hidden_dim[1])
         conv2 = []
         for _ in range(self.depth[1]):
             conv2.append(Convblock(hidden_dim=self.hidden_dim[1], 
@@ -196,6 +197,7 @@ class Convformer(nn.Module):
 
         #  stage 3 ********************************************
         self.patch_embed3 = PatchEmbed(in_channels=self.hidden_dim[1], hidden_dim=self.hidden_dim[2], patch_size=self.patch_size[2])
+        self.up2 = nn.Linear(self.hidden_dim[1], self.hidden_dim[2])
         conv3 = []
         for _ in range(self.depth[2]):
             conv3.append(Convblock(hidden_dim=self.hidden_dim[2], 
@@ -218,7 +220,7 @@ class Convformer(nn.Module):
         self.norm = nn.LayerNorm(self.hidden_dim[2])
         self.fc = nn.Linear(self.hidden_dim[2], cfg.num_classes)
 
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
+        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim[0]))
 
     def forward(self, x):
         b, _, _, _ = x.shape
@@ -238,6 +240,7 @@ class Convformer(nn.Module):
 
         x = self.patch_embed2(x)
         _, _, H, W = x.shape
+        latent = self.up1(latent)
         for conv, transformer in self.stage2:
             x = conv(x)
             context = x.permute(0, 2, 3, 1)
@@ -250,6 +253,7 @@ class Convformer(nn.Module):
 
         x = self.patch_embed3(x)
         _, _, H, W = x.shape
+        latent = self.up2(latent)
         for conv, transformer in self.stage3:
             x = conv(x)
             context = x.permute(0, 2, 3, 1)

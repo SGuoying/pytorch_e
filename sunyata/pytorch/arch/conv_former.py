@@ -143,7 +143,7 @@ class PatchEmbed(nn.Module):
         B, C, H, W = x.shape
         # assert H == self.image_size[0] and W == self.image_size[1], \
         #     f"Input image size ({H}*{W}) doesn't match model ({self.image_size[0]}*{self.image_size[1]})."
-        # x = self.embed(x)
+        x = self.embed(x)
         return x
     
 
@@ -156,12 +156,11 @@ class Convformer(nn.Module):
         self.patch_size = [4, 4, 2]
         self.hidden_dim = [64, 128, 256]
         self.depth = [2, 2, 2]
-        self.patch_embed1 = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim[0], patch_size=self.patch_size[0])
-        self.patch_embed2 = PatchEmbed(in_channels=self.hidden_dim[0], hidden_dim=self.hidden_dim[1], patch_size=self.patch_size[1])
-        self.patch_embed3 = PatchEmbed(in_channels=self.hidden_dim[1], hidden_dim=self.hidden_dim[2], patch_size=self.patch_size[2])
+        
         #  stage 1
+        self.patch_embed1 = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim[0], patch_size=self.patch_size[0])
         conv1 = []
-        for i in range(self.depth[0]):
+        for _ in range(self.depth[0]):
             conv1.append(Convblock(hidden_dim=self.hidden_dim[0], 
                                    kernel_size=cfg.kernel_size, 
                                    drop_rate=cfg.drop_rate))
@@ -175,9 +174,10 @@ class Convformer(nn.Module):
                                  drop_rate=cfg.drop_rate)
         ])
 
-        #  stage 2
+        #  stage 2 **********************************************
+        self.patch_embed2 = PatchEmbed(in_channels=self.hidden_dim[0], hidden_dim=self.hidden_dim[1], patch_size=self.patch_size[1])
         conv2 = []
-        for i in range(self.depth[1]):
+        for _ in range(self.depth[1]):
             conv2.append(Convblock(hidden_dim=self.hidden_dim[1], 
                                    kernel_size=cfg.kernel_size, 
                                    drop_rate=cfg.drop_rate))
@@ -194,9 +194,10 @@ class Convformer(nn.Module):
                                  drop_rate=cfg.drop_rate)
         ])
 
-        #  stage 3
+        #  stage 3 ********************************************
+        self.patch_embed3 = PatchEmbed(in_channels=self.hidden_dim[1], hidden_dim=self.hidden_dim[2], patch_size=self.patch_size[2])
         conv3 = []
-        for i in range(self.depth[2]):
+        for _ in range(self.depth[2]):
             conv3.append(Convblock(hidden_dim=self.hidden_dim[2], 
                                    kernel_size=cfg.kernel_size, 
                                    drop_rate=cfg.drop_rate))
@@ -213,6 +214,7 @@ class Convformer(nn.Module):
                                  drop_rate=cfg.drop_rate)
         ])
 
+        #  classifier ********************************************
         self.norm = nn.LayerNorm(self.hidden_dim[2])
         self.fc = nn.Linear(self.hidden_dim[2], cfg.num_classes)
 
@@ -223,29 +225,31 @@ class Convformer(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
         x = self.patch_embed1(x)
-        B, C, H, W = x.shape
+        _, _, H, W = x.shape
         for conv, transformer in self.stage1:
             x = conv(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = transformer(latent, context=context) + latent
+            B, _, C = latent.shape
             # latent = self.norm(latent)
         x = latent[:, 1:].transpose(1, 2).reshape(B, C, H, W)
 
         x = self.patch_embed2(x)
-        B, C, H, W = x.shape
+        _, _, H, W = x.shape
         for conv, transformer in self.stage2:
             x = conv(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = transformer(latent, context=context) + latent
+            B, _, C = latent.shape
             # latent = self.norm(latent)
         x = latent[:, 1:].transpose(1, 2).reshape(B, C, H, W)
 
         x = self.patch_embed3(x)
-        B, C, H, W = x.shape
+        _, _, H, W = x.shape
         for conv, transformer in self.stage3:
             x = conv(x)
             context = x.permute(0, 2, 3, 1)

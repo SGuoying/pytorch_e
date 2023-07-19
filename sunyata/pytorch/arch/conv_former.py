@@ -229,7 +229,9 @@ class Convformer(nn.Module):
         x = self.patch_embed1(x)
         _, _, H, W = x.shape
         for conv, transformer in self.stage1:
-            x = conv(x)
+            # x = conv(x)
+            for layer in conv:
+                x = layer(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
@@ -242,7 +244,9 @@ class Convformer(nn.Module):
         _, _, H, W = x.shape
         latent = self.up1(latent)
         for conv, transformer in self.stage2:
-            x = conv(x)
+            # x = conv(x)
+            for layer in conv:
+                x = layer(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
@@ -255,7 +259,9 @@ class Convformer(nn.Module):
         _, _, H, W = x.shape
         latent = self.up2(latent)
         for conv, transformer in self.stage3:
-            x = conv(x)
+            # x = conv(x)
+            for layer in conv:
+                x = layer(x)
             context = x.permute(0, 2, 3, 1)
             context = rearrange(context, 'b ... d -> b (...) d')
             latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)

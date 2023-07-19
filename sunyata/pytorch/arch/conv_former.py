@@ -384,8 +384,8 @@ class Convformer3(nn.Module):
                                     drop_rate=cfg.drop_rate)
 
         #  classifier ********************************************
-        self.norm = nn.LayerNorm(self.hidden_dim[2])
-        self.fc = nn.Linear(self.hidden_dim[2], cfg.num_classes)
+        self.norm = nn.LayerNorm(self.hidden_dim[3])
+        self.fc = nn.Linear(self.hidden_dim[3], cfg.num_classes)
 
         # self.latent = nn.Parameter(torch.randn(1, self.hidden_dim[0]))
 

@@ -448,7 +448,8 @@ class Convformer(nn.Module):
 
         self.cfg = cfg
         self.patch_size = [4, 4, 2]
-        self.hidden_dim = [64, 128, 256]
+        self.hidden_dim = [96, 160, 256]
+        # self.hidden_dim = cfg.hidden_dim
         self.depth = [2, 2, 2]
 
         #  stage 1

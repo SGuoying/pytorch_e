@@ -320,6 +320,11 @@ class Convformer3(nn.Module):
         #  classifier ********************************************
         self.norm = nn.LayerNorm(self.hidden_dim)
         self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1,1)),
+            nn.Flatten(),
+            nn.Linear(self.hidden_dim, cfg.num_classes)
+        )
 
         self.latent = nn.Parameter(torch.randn(1, self.hidden_dim))
 
@@ -354,12 +359,14 @@ class Convformer3(nn.Module):
         context = rearrange(context, 'b ... d -> b (...) d')
         latent = self.stage4(latent, context) + latent
 
-        B, _, C = latent.shape
+        # B, _, C = latent.shape
+        x = self.digup(x)
 
         # x1 = latent[:, 3:].transpose(1, 2).reshape(B, C, H, W)
         latent = reduce(latent, 'b n d -> b d', 'mean')
         latent = self.norm(latent)
-        return self.fc(latent)
+        latent = self.fc(latent)
+        return [x, latent]
 
         
 class Convformer(nn.Module):

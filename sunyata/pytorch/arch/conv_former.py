@@ -505,7 +505,7 @@ class ConvMixerV3(nn.Module):
         self.downsample = nn.ModuleList([])
 
         self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
-                                       patch_size=self.patch_size[0])
+                                       patch_size=cfg.patch_size)
         self.downsample.append(self.patch_embed)
         for i in range(3):
             self.downsample.append(PatchEmbed(in_channels=self.hidden_dim, hidden_dim=self.hidden_dim, patch_size=self.patch_size[i+1]))

@@ -490,9 +490,8 @@ class ConvMixerV2(nn.Module):
             latent = self.norm(latent)
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')
-        latent = torch.cat([latent, x], dim=1)
 
-        return self.fc(latent)
+        return self.fc(latent + x)
         
 
 

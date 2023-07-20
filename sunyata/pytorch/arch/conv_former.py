@@ -376,118 +376,45 @@ class Convformer(nn.Module):
 
         self.cfg = cfg
         self.patch_size = cfg.patch_size
-        self.hidden_dim = [64, 128, 192, 256]
+        self.hidden_dim = cfg.hidden_dim
 
-        self.depth = [2, 2, 2, 2]
+        self.depth = cfg.num_layers
 
         #  stage 1
-        self.patch_embed1 = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim[0], patch_size=self.patch_size[0])
-        conv1 = []
-        for _ in range(self.depth[0]):
-            conv1.append(Convblock(hidden_dim=self.hidden_dim[0],
-                                   kernel_size=cfg.kernel_size,
-                                   drop_rate=cfg.drop_rate))
-        # conv1.append()
-        self.conv1 = nn.Sequential(*conv1)
-        # self.stage1 = nn.ModuleList([
-        #     self.conv1,
-        #     transformer(hidden_dim=self.hidden_dim[0],
-        #                 mlp_rate=4,
-        #                 kernel_size=cfg.kernel_size,
-        #                 drop_rate=cfg.drop_rate)
-        # ])
-        self.stage1 = transformer(hidden_dim=self.hidden_dim[0],
-                                  mlp_rate=4,
-                                  kernel_size=cfg.kernel_size,
-                                  drop_rate=cfg.drop_rate)
+        self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim, patch_size=self.patch_size)
 
-        #  stage 2 **********************************************
-        self.patch_embed2 = PatchEmbed(in_channels=self.hidden_dim[0], hidden_dim=self.hidden_dim[1],
-                                       patch_size=self.patch_size[1])
-        self.up1 = nn.Linear(self.hidden_dim[0], self.hidden_dim[1])
-        conv2 = []
-        for _ in range(self.depth[1]):
-            conv2.append(Convblock(hidden_dim=self.hidden_dim[1],
-                                   kernel_size=cfg.kernel_size,
-                                   drop_rate=cfg.drop_rate))
-        # conv2.append(transformer(hidden_dim=self.hidden_dim[1],
-        #                             mlp_rate=cfg.mlp_rate,
-        #                             kernel_size=cfg.kernel_size,
-        #                             drop_rate=cfg.drop_rate))
-        self.conv2 = nn.Sequential(*conv2)
-        self.stage2 =  transformer(hidden_dim=self.hidden_dim[1],
-                        mlp_rate=4,
-                        kernel_size=cfg.kernel_size,
-                        drop_rate=cfg.drop_rate)
-
-        #  stage 3 ********************************************
-        self.patch_embed3 = PatchEmbed(in_channels=self.hidden_dim[1], hidden_dim=self.hidden_dim[2],
-                                       patch_size=self.patch_size[2])
-        self.up2 = nn.Linear(self.hidden_dim[1], self.hidden_dim[2])
-        conv3 = []
-        for _ in range(self.depth[2]):
-            conv3.append(Convblock(hidden_dim=self.hidden_dim[2],
-                                   kernel_size=cfg.kernel_size,
-                                   drop_rate=cfg.drop_rate))
-        # conv3.append(transformer(hidden_dim=self.hidden_dim[2],
-        #                             mlp_rate=cfg.mlp_rate,
-        #                             kernel_size=cfg.kernel_size,
-        #                             drop_rate=cfg.drop_rate))
-        self.conv3 = nn.Sequential(*conv3)
-
-        self.stage3 = transformer(hidden_dim=self.hidden_dim[2],
-                                  mlp_rate=4,
-                                  kernel_size=cfg.kernel_size,
-                                  drop_rate=cfg.drop_rate)
-
+        self.conv = nn.ModuleList([])
+        for _ in range(self.depth):
+            conv = block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
+            self.conv.append(conv)
+        
+        self.trans = nn.ModuleList([])
+        for _ in range(self.depth):
+            trans = transformer(hidden_dim=self.hidden_dim,
+                              mlp_rate=4,
+                              kernel_size=cfg.kernel_size,
+                              drop_rate=cfg.drop_rate)
+            self.trans.append(trans)
 
         #  classifier ********************************************
-        self.norm = nn.LayerNorm(self.hidden_dim[2])
-        self.fc = nn.Linear(self.hidden_dim[2], cfg.num_classes)
+        self.norm = nn.LayerNorm(self.hidden_dim)
+        self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
 
-        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim[0]))
+        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim))
 
     def forward(self, x):
         b, _, _, _ = x.shape
         latent = repeat(self.latent, 'n d -> b n d', b=b)
 
-        #  stage 1 ********
-        x = self.patch_embed1(x)
-        _, _, H, W = x.shape
-        x1 = self.conv1(x)
-        context = x1.permute(0, 2, 3, 1)
-        context = rearrange(context, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
-        latent = self.stage1(latent, context) + latent
+        x = self.patch_embed(x)
 
-        B, _, C = latent.shape
-            # latent = self.norm(latent)
-        x = latent[:, 1:].transpose(1, 2).reshape(B, C, H, W) + x1
+        #  stage 
+        for i in range(self.depth):
+            x = self.conv[i](x)
+            context = x.permute(0, 2, 3, 1)
+            context = rearrange(context, 'b ... d -> b (...) d')
+            latent = self.trans[i](latent, context)
 
-        #  stage 2 ********
-        x = self.patch_embed2(x)
-        _, _, H, W = x.shape
-        latent = self.up1(latent)
-        x2 = self.conv2(x)
-        context = x2.permute(0, 2, 3, 1)
-        context = rearrange(context, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
-        latent = self.stage2(latent, context) + latent
-
-        B, _, C = latent.shape
-            # latent = self.norm(latent)
-        x = latent[:, 1:].transpose(1, 2).reshape(B, C, H, W) + x2
-
-        #  stage 3 ********
-        x = self.patch_embed3(x)
-        _, _, H, W = x.shape
-        latent = self.up2(latent)
-        x = self.conv3(x)
-        context = x.permute(0, 2, 3, 1)
-        context = rearrange(context, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], context], dim=1)
-        latent = self.stage3(latent, context) + latent
-        
         # x = latent[:, 1:].transpose(1, 2).reshape(B, C, H, W)
         latent = reduce(latent, 'b n d -> b d', 'mean')
         latent = self.norm(latent)
@@ -500,21 +427,22 @@ class block(nn.Module):
         super().__init__()
         self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=7, padding=3, groups=hidden_dim)
         self.norm = nn.LayerNorm(hidden_dim)
-        self.pwconv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
+        self.pwconv = nn.Conv2d(hidden_dim, hidden_dim*4, kernel_size=1)
         self.act = nn.GELU()
         self.drop = nn.Dropout(drop_rate)
-        self.pwconv2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
+        self.pwconv2 = nn.Conv2d(hidden_dim*4, hidden_dim, kernel_size=1)
 
     def forward(self, x):
-        x = self.pwconv(x)
         clone = x
+        
         x = self.dwconv(x)
         x = x.permute(0, 2, 3, 1)
         x = self.norm(x)
         x = x.permute(0, 3, 1, 2)
+        x = self.pwconv(x)
+        x = self.act(x) 
         x = self.pwconv2(x)
-        x = self.act(x) + clone
-        x = self.drop(x)
+        x = self.drop(x) + clone
         return x
     
 class ConvMixerV2(nn.Module):

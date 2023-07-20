@@ -425,24 +425,19 @@ class Convformer(nn.Module):
 class block(nn.Module):
     def __init__(self, hidden_dim, drop_rate=0.):
         super().__init__()
-        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=7, padding=3, groups=hidden_dim)
-        self.norm = nn.LayerNorm(hidden_dim)
-        self.pwconv = nn.Conv2d(hidden_dim, hidden_dim*4, kernel_size=1)
-        self.act = nn.GELU()
-        self.drop = nn.Dropout(drop_rate)
-        self.pwconv2 = nn.Conv2d(hidden_dim*4, hidden_dim, kernel_size=1)
-
+        self.block = nn.Sequential(
+            Residual(nn.Sequential(
+                nn.Conv2d(hidden_dim, hidden_dim, 7, groups=hidden_dim, padding="same"),
+                nn.GELU(),
+                nn.BatchNorm2d(hidden_dim),
+            )),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim), 
+            nn.Dropout(drop_rate),
+        )
     def forward(self, x):
-        clone = x
-        
-        x = self.dwconv(x)
-        x = x.permute(0, 2, 3, 1)
-        x = self.norm(x)
-        x = x.permute(0, 3, 1, 2)
-        x = self.pwconv(x)
-        x = self.act(x) 
-        x = self.pwconv2(x)
-        x = self.drop(x) + clone
+        x = self.block(x)
         return x
     
 class ConvMixerV2(nn.Module):
@@ -468,20 +463,36 @@ class ConvMixerV2(nn.Module):
             )
             self.conv.append(stage)
 
+        self.attn = Attention(query_dim=self.hidden_dim,
+                              context_dim=self.hidden_dim,
+                              heads=1,
+                              dim_head=self.hidden_dim,)
+
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
             nn.LayerNorm(self.hidden_dim),
-            nn.Linear(self.hidden_dim, cfg.num_classes)
         )
+        self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
+        self.norm = nn.LayerNorm(self.hidden_dim)
+        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim))
 
     def forward(self, x):
         B, _, H, W = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b=B)
+
         for i in range(4):
             x = self.downsample[i](x)
             x = self.conv[i](x)
+            context = x.permute(0, 2, 3, 1)
+            context = rearrange(context, 'b ... d -> b (...) d')
+            latent = self.attn(latent, context) + latent
+            latent = self.norm(latent)
         x = self.digup(x)
-        return x
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        latent = torch.cat([latent, x], dim=1)
+
+        return self.fc(latent)
         
 
 

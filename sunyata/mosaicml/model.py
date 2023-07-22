@@ -10,6 +10,7 @@ from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Co
 
 from sunyata.pytorch.arch.convmixer import BayesConvMixer3, BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, BayesConvMixer, ConvMixer3, Former, bayesFormer
 from sunyata.pytorch.arch.conv_former import ConvMixerV1, ConvMixerV2, ConvMixerV3, ConvMixerV4, Convformer, Convformer2, Convformer3
+from sunyata.pytorch.arch.convnext import ConvNeXtV2
 
 # %%
 def build_composer_convmixer(model_name: str = 'convmixer',
@@ -87,6 +88,9 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = ConvMixerV2(cfg)
     elif model_name == "ConvMixerV3":
         model = ConvMixerV3(cfg)
+
+    elif model_name == "ConvNeXtV2":
+        model = ConvNeXtV2(cfg)
 
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

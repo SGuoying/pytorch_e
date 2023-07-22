@@ -99,259 +99,110 @@ class ConvMixerCfg(BaseCfg):
 
 # %%
 
-
 class ConvMixer(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
+        super(ConvMixer, self).__init__()
 
-        # self.layers = nn.ModuleList([
-        #     ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-        #     for _ in range(cfg.num_layers)
-        # ])
-        
-        self.layers = nn.Sequential(*[
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
+        self.layers = nn.ModuleList([
+            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
         self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
+            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size, stride=cfg.patch_size),
             nn.GELU(),
-            nn.BatchNorm2d(cfg.hidden_dim),
+            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),  # eps>6.1e-5 to avoid nan in half precision
         )
-
+        
         self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
             nn.Linear(cfg.hidden_dim, cfg.num_classes)
         )
 
         self.cfg = cfg
-
+        
     def forward(self, x):
         x = self.embed(x)
-        x = self.layers(x)
+        for layer in self.layers:
+            x = x + layer(x)
         x = self.digup(x)
         return x
 
-class ConvMixer2(nn.Module):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
-
-        self.layers = nn.Sequential(*[
-            ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
-        ])
-
-        self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
-            nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
-        )
-
-        # self.digup = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d((1, 1)),
-        #     nn.Flatten(),
-        #     nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        # )
-
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
-        self.digup = Attention(query_dim=cfg.hidden_dim,
-                      context_dim=cfg.hidden_dim,
-                      heads=1, 
-                      dim_head=cfg.hidden_dim,
-                      )
-        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
-        self.cfg = cfg
-
-    def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
-
-        x = self.embed(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = latent + self.digup(latent, input)
-        latent = self.logits_layer_norm(latent)
-
-        for layer in self.layers:
-            x = layer(x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            latent = latent + self.digup(latent, input)
-            latent = self.logits_layer_norm(latent)
-
-        # x = self.digup(x)
-        latent = nn.Flatten()(latent)
-        logits = self.fc(latent)
-        return logits
-
-
-class FCUUp(nn.Module):
-    """ Transformer patch embeddings -> CNN feature maps
-    """
-
-    def __init__(self, hidden_dim, up_stride=1):
-        super(FCUUp, self).__init__()
-
-        self.up_stride = up_stride
-        self.conv_project = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
-        self.bn = nn.BatchNorm2d(hidden_dim)
-        self.act = nn.GELU()
-
-    def forward(self, x, H, W):
-        B, _, C = x.shape
-        # [N, 197, 384] -> [N, 196, 384] -> [N, 384, 196] -> [N, 384, 14, 14]
-        x_r = x[:, 1:].transpose(1, 2).reshape(B, C, H, W)
-        x_r = self.act(self.bn(self.conv_project(x_r)))
-
-        return F.interpolate(x_r, size=(H * self.up_stride, W * self.up_stride))
-    
-
-class ConvMixer3(ConvMixer):
+# %%
+class ConvMixer2(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
-
         self.layers = nn.Sequential(*[
             ConvMixerLayer2(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
             for _ in range(cfg.num_layers)
         ])
 
-        self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
-            nn.GELU(),
-            nn.BatchNorm2d(cfg.hidden_dim),
-        )
-
-        # self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
-        self.digup = Attention(query_dim=cfg.hidden_dim,
-                      context_dim=cfg.hidden_dim,
-                      heads=1, 
-                      dim_head=cfg.hidden_dim,
-                      )
-        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        # self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        
-        self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-
-        self.cfg = cfg
-
     def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
-
         x = self.embed(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = latent + self.digup(latent, input)
-        latent = self.logits_layer_norm(latent)
+        x= self.layers(x)
+        x= self.digup(x)
+        return x
 
-        for layer in self.layers:
-            x = layer(x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-            latent = latent + self.digup(latent, input)
-            latent = self.logits_layer_norm(latent)
 
-        latent = reduce(latent, 'b n d -> b d', 'mean')
-        return self.fc(latent)
-
-class BayesConvMixer(ConvMixer):
+# %%
+class IterConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         if cfg.layer_norm_zero_init:
-            self.logits_layer_norm.weight.data = torch.zeros(
-                self.logits_layer_norm.weight.data.shape)
-
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+        
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
         )
-        # self.digup = eca_layer(dim=cfg.hidden_dim, kernel_size=cfg.eca_kernel_size)
+#         self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
-        # logits = torch.zeros(1, cfg.hidden_dim)
-        # self.register_buffer('logits', logits)
-
     def forward(self, x):
         x = self.embed(x)
-        logits = self.digup(x)
+        logits = self.logits_layer_norm(self.digup(x))
         for layer in self.layers:
             if self.skip_connection:
                 x = x + layer(x)
             else:
                 x = layer(x)
+            logits = logits + self.logits_layer_norm(self.digup(x))
+#             logits = self.logits_layer_norm(logits)
+        logits = self.fc(self.logits_layer_norm(logits))
+        return logits
+
+# %%
+class BayesConvMixer2(ConvMixer2):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1,1)),
+            nn.Flatten(),
+        )
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+
+
+    def forward(self, x):
+        x = self.embed(x)
+        logits = self.digup(x)
+        for layer in self.layers:
+            x = layer(x)
             logits = logits + self.digup(x)
             logits = self.logits_layer_norm(logits)
         logits = self.fc(logits)
         return logits
 
-class CombineConvMixer(ConvMixer):
+# %%
+class IterAttnConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
-
-        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
-        if cfg.layer_norm_zero_init:
-            self.logits_layer_norm.weight.data = torch.zeros(
-                self.logits_layer_norm.weight.data.shape)
-
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
-        )
-        # self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.skip_connection = cfg.skip_connection
-
-    def forward(self, x):
-        x = self.embed(x)
-        logits = self.digup(x)
-        logits = self.logits_layer_norm(logits)
-        for i, layer in enumerate(self.layers):
-            if self.skip_connection:
-                x = x + layer(x)
-            else:
-                x = layer(x)
-            
-            if i == 0:
-                logit = self.digup(x) + logits
-            else:
-                logit = logits + self.digup(x)
-            
-            logits = self.logits_layer_norm(logit) + logits
-            # logits = self.logits_layer_norm(self.digup(
-            #     x) if i == 0 else logits + self.digup(x)) + logits
-            # logits = logits + self.digup(x)
-            # logits = self.logits_layer_norm(logits)
-        logits = self.fc(logits)
-        return logits
-
-from einops.layers.torch import Rearrange, Reduce
-
-
-class BayesConvMixer3(ConvMixer):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
-
-        self.layers = nn.Sequential(*[
-            ConvMixerLayer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate)
-            for _ in range(cfg.num_layers)
-        ])
 
         self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
         if cfg.layer_norm_zero_init:
@@ -362,54 +213,41 @@ class BayesConvMixer3(ConvMixer):
         self.digup = Attention(query_dim=cfg.hidden_dim,
                       context_dim=cfg.hidden_dim,
                       heads=1, 
-                      dim_head=cfg.hidden_dim,
+                      dim_head=cfg.hidden_dim
                       )
         
         # self.digup = eca_layer(kernel_size=cfg.eca_kernel_size)
-        self.fcn_up = FCUUp(cfg.hidden_dim, up_stride=1)
-
-        self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
-        # self.skip_connection = cfg.skip_connection
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.skip_connection = cfg.skip_connection
 
     def forward(self, x):
         batch_size, _, _, _ = x.shape
         latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
         x = self.embed(x)
-        _, _, H, W = x.shape
         input = x.permute(0, 2, 3, 1)
         input = rearrange(input, 'b ... d -> b (...) d')
-        # new add
-        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        # latent = torch.cat([latent, input], dim=1)
-
         latent = latent + self.digup(latent, input)
         latent = self.logits_layer_norm(latent)
 
         for layer in self.layers:
-            x = x + layer(x)
+            if self.skip_connection:
+                x = x + layer(x)
+            else:
+                x = layer(x)
             
             input = x.permute(0, 2, 3, 1)
             input = rearrange(input, 'b ... d -> b (...) d')
-            # new add
-            # latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
             latent = latent + self.digup(latent, input)
             latent = self.logits_layer_norm(latent)
 
-        x1 = self.fcn_up(latent, H, W)
-        x = self.fc(x1 + x)
+        latent = nn.Flatten()(latent)
+        logits = self.fc(latent)
+        return logits
 
-        # latent = nn.Flatten()(latent)
-        # latent = reduce(latent, 'b n d -> b d', 'mean')
-        # logits = self.fc(latent)
-        return x
-    
+
 # %%
-class BayesConvMixer4(BayesConvMixer3):
+class BayesConvMixer4(IterAttnConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
@@ -460,222 +298,3 @@ class BayesConvMixer5(ConvMixer):
         latent = nn.Flatten()(latent)
         logits = self.fc(latent)
         return logits
-
-
-class Mlp(nn.Module):
-    """
-    Implementation of MLP with 1*1 convolutions.
-    Input: tensor with shape [B, C, H, W]
-    """
-    def __init__(self, in_features, hidden_features=None, 
-                 out_features=None,  drop=0.):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
-        # self.dw = nn.Conv2d(hidden_features, hidden_features, 3, groups=hidden_features, padding=1)
-        self.act = nn.GELU()
-        self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
-        self.drop = nn.Dropout(drop)
-    #     self.apply(self._init_weights)
-
-    # def _init_weights(self, m):
-    #     if isinstance(m, nn.Conv2d):
-    #         trunc_normal_(m.weight, std=.02)
-    #         if m.bias is not None:
-    #             nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        # x = self.dw(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
-
-
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn, norm_layer = nn.LayerNorm):
-        super().__init__()
-        self.norm = norm_layer(dim)
-        self.fn = fn
-    def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
-    
-
-class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout = 0.):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.net(x)
-class token_mixer(nn.Module):
-    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
-        super().__init__()
-        self.layer1 = nn.Sequential(
-            Residual(nn.Sequential(
-                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
-                nn.GELU(),
-                nn.BatchNorm2d(hidden_dim),
-            )),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
-            nn.GELU(),
-            nn.BatchNorm2d(hidden_dim), 
-            # StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
-        )
-        
-        self.attn_layers = Attention(query_dim=hidden_dim, 
-                                context_dim=hidden_dim, 
-                                heads=1, 
-                                dim_head=hidden_dim, 
-                                )
-        self.drop = nn.Dropout(drop_rate)
-        self.latent = nn.Parameter(torch.randn(1, hidden_dim))
-        self.norm = nn.LayerNorm(hidden_dim)
-
-    def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
-
-        x = self.layer1(x)
-        x = self.drop(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = torch.cat([latent[:, 0][:, None, :], input], dim=1)
-        latent = latent + self.attn_layers(latent, input)
-        latent = self.norm(latent)
-        return latent
-    
-class conv_mixer(nn.Module):
-    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
-        super().__init__()
-        self.conv1 = nn.Conv2d(hidden_dim, hidden_dim, 1)
-        self.dw = nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same")
-        self.act = nn.GELU()
-        self.eca = ecablock(hidden_dim, kernel_size)
-        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, 1)
-        self.act2 = nn.GELU()
-
-    def forward(self, x):
-        clone = x.clone()
-        x = self.conv1(x)
-        x = self.act(x)
-        x = self.dw(x)
-        x = self.eca(x)
-        x = self.act2(x)
-        x = self.conv2(x)
-        x = x + clone
- 
-        return x
-
-    
-class block(nn.Module):
-    def __init__(self, hidden_dim: int, kernel_size: int, mlp_ratp: int, drop_rate: float=0.):
-        super().__init__()
-        self.norm1 = nn.BatchNorm2d(hidden_dim)
-
-        self.token_mixer = conv_mixer(hidden_dim, kernel_size, drop_rate)
-        self.norm2 = nn.BatchNorm2d(hidden_dim)
-        self.mlp = Mlp(hidden_dim, hidden_features=hidden_dim*mlp_ratp, drop=drop_rate)
-
-        self.drop = nn.Dropout(drop_rate) if drop_rate > 0. else nn.Identity()
-
-    def forward(self, x):
-        x = x + self.drop(self.token_mixer(self.norm1(x)))
-        x = x + self.drop(self.mlp(self.norm2(x)))
-        return x
-    
-class Former(nn.Module):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
-        self.cfg = cfg
-
-        self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
-            nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
-        )
-
-        layers = []
-        for _ in range(cfg.num_layers):
-            layers.append(
-                block(cfg.hidden_dim, cfg.kernel_size, 4, cfg.drop_rate)
-                )
-        self.layers = nn.Sequential(*layers)
-
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
-
-        self.norm = nn.LayerNorm(cfg.hidden_dim)
-
-    def forward(self, x):
-        x = self.embed(x)
-        b, _, h, w = x.shape
-        for layer in self.layers:
-            x = layer(x)
-            x = x.flatten(2).transpose(1, 2)
-            x = self.norm(x)
-            x = x.reshape(b, h, w, -1).permute(0, 3, 1, 2).contiguous()
-
-        x = self.digup(x)
-        return x
-    
-
-class bayesFormer(nn.Module):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__()
-        self.cfg = cfg
-
-        self.embed = nn.Sequential(
-            nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size,
-                      stride=cfg.patch_size),
-            nn.GELU(),
-            # eps>6.1e-5 to avoid nan in half precision
-            nn.BatchNorm2d(cfg.hidden_dim, eps=7e-5),
-        )
-
-        self.layers = nn.ModuleList([])
-        for _ in range(cfg.num_layers):
-            self.layers.append(nn.ModuleList([
-                PreNorm(cfg.hidden_dim, conv_mixer(cfg.hidden_dim, cfg.kernel_size, cfg.drop_rate), nn.Identity),
-                PreNorm(cfg.hidden_dim, FeedForward(cfg.hidden_dim, cfg.hidden_dim*4))
-            ])
-                )
-        
-
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            # nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        )
-        self.fc =  nn.Linear(cfg.hidden_dim, cfg.num_classes)
-
-        self.norm = nn.LayerNorm(cfg.hidden_dim)
-
-    def forward(self, x):
-        x = self.embed(x)
-        logits = self.digup(x)
-
-        for conv, mlp in self.layers:
-            x = conv(x)
-            logits = logits + self.digup(x)
-            # logits = self.norm(logits)
-            logits = mlp(logits) + logits
-
-        logits = self.norm(logits)
-        logits = self.fc(logits)
-        return logits
-
-

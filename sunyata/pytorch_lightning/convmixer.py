@@ -5,20 +5,43 @@ import torch.nn.functional as F
 from einops import repeat
 import pytorch_lightning as pl
 from sunyata.pytorch.arch.base import BaseCfg, Residual
-from sunyata.pytorch_lightning.base import BaseModule
+from sunyata.pytorch_lightning.base import BaseModule, ClassifierModule
 
+from sunyata.pytorch.arch.convmixer import ConvMixer, ConvMixerCfg, IterAttnConvMixer, IterConvMixer
 from sunyata.pytorch.arch.bayes.core import log_bayesian_iteration
 
 
-@dataclass
-class ConvMixerCfg(BaseCfg):
-    hidden_dim: int = 256
-    kernel_size: int = 5
-    patch_size: int = 2
-    num_classes: int = 10
+# %%
+class PlConvMixer(ClassifierModule):
+    def __init__(self, cfg:ConvMixerCfg):
+        super(PlConvMixer, self).__init__(cfg)
+        self.convmixer = ConvMixer(cfg)
+    
+    def forward(self, x):
+        return self.convmixer(x)
+
+# %%
+class PlIterAttnConvMixer(ClassifierModule):
+    def __init__(self, cfg:ConvMixerCfg):
+        super(PlIterAttnConvMixer, self).__init__(cfg)
+        self.convmixer = IterAttnConvMixer(cfg)
+    
+    def forward(self, x):
+        return self.convmixer(x)
 
 
-class ConvMixer(BaseModule):
+# %%
+class PlIterConvMixer(ClassifierModule):
+    def __init__(self, cfg:ConvMixerCfg):
+        super(PlIterConvMixer, self).__init__(cfg)
+        self.convmixer = IterConvMixer(cfg)
+    
+    def forward(self, x):
+        return self.convmixer(x)
+
+
+# %%
+class PlConvMixerOld(BaseModule):
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__(cfg)
 
@@ -65,7 +88,7 @@ class ConvMixer(BaseModule):
         return loss
 
 
-class SumConvMixer(ConvMixer):
+class SumConvMixer(PlConvMixerOld):
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__(cfg)
         self.layers = nn.Sequential(*[
@@ -89,7 +112,7 @@ class SumConvMixer(ConvMixer):
         return x
 
 
-class BayesConvMixer(ConvMixer):
+class BayesConvMixer(PlConvMixerOld):
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__(cfg)
 
@@ -120,7 +143,7 @@ class BayesConvMixer(ConvMixer):
         return loss
 
         
-class BayesConvMixer2(ConvMixer):
+class BayesConvMixer2(PlConvMixerOld):
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__(cfg)
 
@@ -150,4 +173,3 @@ class BayesConvMixer2(ConvMixer):
         self.log(mode + "_accuracy", accuracy, prog_bar=True)
         return loss
 
-        

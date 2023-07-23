@@ -90,7 +90,6 @@ class ConvMixerCfg(BaseCfg):
     num_classes: int = 10
 
     drop_rate: float = 0.
-    squeeze_factor: int = 4
 
     layer_norm_zero_init: bool = True
     skip_connection: bool = True

@@ -310,13 +310,13 @@ class ConvMixerV3(BaseModule):
         self.norm = nn.ModuleList([])
         for i in range(4):
 
-            attn = Attention(query_dim=self.hidden_dim[i],
-                             context_dim=self.hidden_dim[i],
+            attn = Attention(query_dim=self.hidden_dim[-1],
+                             context_dim=self.hidden_dim[-1],
                              heads=1,
-                             dim_head=self.hidden_dim[i],)
+                             dim_head=self.hidden_dim[-1],)
             self.attn.append(attn)
 
-            norm = nn.LayerNorm(self.hidden_dim[i])
+            norm = nn.LayerNorm(self.hidden_dim[-1])
             self.norm.append(norm)
 
             if i != 2:
@@ -348,7 +348,7 @@ class ConvMixerV3(BaseModule):
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.LayerNorm(self.hidden_dim[3]),
+            nn.LayerNorm(self.hidden_dim[-1]),
         )
         self.fc = nn.Linear(self.hidden_dim[3], cfg.num_classes)
         self.latent = nn.Parameter(torch.randn(1, self.hidden_dim[-1]))

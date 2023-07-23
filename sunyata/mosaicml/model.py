@@ -9,7 +9,7 @@ from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg, ViT
 from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Conformer3_1, Conformer3_2, Conformer4, Conformer_1, Conformer_2, Convolution
 
 from sunyata.pytorch.arch.convmixer import  BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer
-from sunyata.pytorch.arch.conv_former import ConvMixerV1, ConvMixerV2, ConvMixerV3, ConvMixerV4, Convformer, Convformer2, Convformer3
+from sunyata.pytorch.arch.conv_former import ConvMixerV1, ConvMixerV2, ConvMixerV3, ConvMixerV4, ConvMixerV5
 from sunyata.pytorch.arch.convnext import ConvNeXtV2, ConvNeXtV1
 
 # %%
@@ -82,6 +82,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = ConvMixerV2(cfg)
     elif model_name == "ConvMixerV3":
         model = ConvMixerV3(cfg)
+    elif model_name == "ConvMixerV5":
+        model = ConvMixerV5(cfg)
 
     elif model_name == "ConvNeXtV2":
         model = ConvNeXtV2(cfg)

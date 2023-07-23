@@ -294,7 +294,6 @@ class ConvMixerV3(BaseModule):
         super().__init__(cfg)
         self.cfg = cfg
         self.hidden_dim = [64, 128, 256, 512]
-        # self.patch_size = [4, 2, 2, 2]
         self.depth = [2, 2, 6, 2]
 
         self.downsample = nn.ModuleList()
@@ -340,8 +339,8 @@ class ConvMixerV3(BaseModule):
         self.upsample = nn.ModuleList()
         for i in range(3):
             upsample = nn.Sequential(
-                nn.Linear(self.hidden_dim[i], self.hidden_dim[i+1]),
-                nn.LayerNorm(self.hidden_dim[i+1])
+                nn.Linear(self.hidden_dim[i], self.hidden_dim[-1]),
+                nn.LayerNorm(self.hidden_dim[-1])
             )
             self.upsample.append(upsample)
         self.upsample.append(nn.Identity())
@@ -352,7 +351,7 @@ class ConvMixerV3(BaseModule):
             nn.LayerNorm(self.hidden_dim[3]),
         )
         self.fc = nn.Linear(self.hidden_dim[3], cfg.num_classes)
-        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim[0]))
+        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim[-1]))
 
     def forward(self, x):
         B, _, H, W = x.shape
@@ -364,18 +363,20 @@ class ConvMixerV3(BaseModule):
                 x = self.conv[i](x)
                 context = x.permute(0, 2, 3, 1)
                 context = rearrange(context, 'b ... d -> b (...) d')
+                context = self.upsample[i](context)
                 latent = self.attn[i](latent, context) + latent
                 latent = self.norm[i](latent)
-                latent = self.upsample[i](latent)
+                # latent = self.upsample[i](latent)
             else:
                 x = self.downsample[i](x)
                 for conv in self.conv[i]:
                     x = conv(x)
                     context = x.permute(0, 2, 3, 1)
                     context = rearrange(context, 'b ... d -> b (...) d')
+                    context = self.upsample[i](context)
                     latent = self.attn[i](latent, context) + latent
                     latent = self.norm[i](latent)
-                latent = self.upsample[i](latent)
+                # latent = self.upsample[i](latent)
 
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')

@@ -746,7 +746,7 @@ class ConvMixerV4(nn.Module):
         return self.fc(x)
     
 
-class ConvMixerV5(nn.Module):
+class ConvMixerV2_1(nn.Module):
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__()
         self.cfg = cfg

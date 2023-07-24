@@ -832,10 +832,9 @@ class ConvMixerV3_2(nn.Module):
 
                     context = context.permute(0, 2, 3, 1)
                     context = rearrange(context, 'b ... d -> b (...) d')
-                    context = self.upsample[i](context)
+                    # context = self.upsample[i](context)
                     latent = self.attn[i](latent, context) + latent
                     latent = self.norm[i](latent)
-                # latent = self.upsample[i](latent)
 
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')

@@ -664,14 +664,14 @@ class ConvMixerV3_1(nn.Module):
 
             if i != 2:
                 stage = nn.Sequential(
-                    *[block2(hidden_dim=self.hidden_dim[i], drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+                    *[block(hidden_dim=self.hidden_dim[i], drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
                 )
                 self.conv.append(stage)
             else:
                 stage = nn.ModuleList()
                 for j in range(self.depth[i] // self.depth[0]):
                     stage_j = nn.Sequential(
-                        *[block2(hidden_dim=self.hidden_dim[i], drop_rate=cfg.drop_rate)
+                        *[block(hidden_dim=self.hidden_dim[i], drop_rate=cfg.drop_rate)
                           for _ in range(self.depth[i]//3)],
                     )
                     stage.append(stage_j)
@@ -680,10 +680,18 @@ class ConvMixerV3_1(nn.Module):
         self.count = self.depth[2] // self.depth[0]
 
         self.upsample = nn.ModuleList()
+        # for i in range(3):
+        #     upsample = nn.Sequential(
+        #         nn.Linear(self.hidden_dim[i], self.hidden_dim[-1]),
+        #         nn.LayerNorm(self.hidden_dim[-1])
+        #     )
+        #     self.upsample.append(upsample)
+        # self.upsample.append(nn.Identity())
         for i in range(3):
             upsample = nn.Sequential(
-                nn.Linear(self.hidden_dim[i], self.hidden_dim[-1]),
-                nn.LayerNorm(self.hidden_dim[-1])
+                nn.Conv2d(self.hidden_dim[i], self.hidden_dim[-1], 1),
+                nn.GELU(),
+                nn.BatchNorm2d(self.hidden_dim[-1])
             )
             self.upsample.append(upsample)
         self.upsample.append(nn.Identity())
@@ -704,21 +712,22 @@ class ConvMixerV3_1(nn.Module):
             if i != 2:
                 x = self.downsample[i](x)
                 x = self.conv[i](x)
-                context = x.permute(0, 2, 3, 1)
+                context = self.upsample[i](x)
+                context = context.permute(0, 2, 3, 1)
                 context = rearrange(context, 'b ... d -> b (...) d')
-                context = self.upsample[i](context)
+                # context = self.upsample[i](context)
                 latent = self.attn[i](latent, context) + latent
                 latent = self.norm[i](latent)
             else:
                 x = self.downsample[i](x)
                 for conv in self.conv[i]:
                     x = conv(x)
-                    context = x.permute(0, 2, 3, 1)
+                    context = self.upsample[i](x)
+                    context = context.permute(0, 2, 3, 1)
                     context = rearrange(context, 'b ... d -> b (...) d')
-                    context = self.upsample[i](context)
+                    # context = self.upsample[i](context)
                     latent = self.attn[i](latent, context) + latent
                     latent = self.norm[i](latent)
-                # latent = self.upsample[i](latent)
 
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')

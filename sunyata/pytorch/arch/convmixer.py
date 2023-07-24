@@ -86,7 +86,7 @@ class ConvMixerCfg(BaseCfg):
     num_layers: int = 8
     hidden_dim: int = 256
     kernel_size: int = 5
-    patch_size: int = 2
+    patch_size: int = 7
     num_classes: int = 10
 
     drop_rate: float = 0.

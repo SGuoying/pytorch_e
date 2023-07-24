@@ -14,7 +14,6 @@ from sunyata.pytorch.arch.convmixer import ConvMixerCfg
 
 
 
-
 class Attention(nn.Module):
     def __init__(self, 
                  query_dim, context_dim=None,
@@ -83,6 +82,7 @@ class block(nn.Module):
     def forward(self, x):
         x = self.block(x)
         return x
+
 
 class ConvMixerV1(BaseModule):
     '''
@@ -535,8 +535,6 @@ class ConvMixerV4(BaseModule):
 
         for i in range(4):
             x = self.conv[i](x)
-            context = x.permute(0, 2, 3, 1)
-            context = rearrange(context, 'b ... d -> b (...) d')
         x = self.digup(x)
 
         return self.fc(x)

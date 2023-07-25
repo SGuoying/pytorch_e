@@ -697,7 +697,7 @@ class ConvMixerV3_1(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
-        self.hidden_dim = [64, 128, 256, 512]
+        self.hidden_dim = [96, 192, 384, 768]
         self.patch_size = [4, 2, 2, 2]
         self.depth = [3, 3, 9, 3]
 

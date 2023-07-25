@@ -699,7 +699,7 @@ class ConvMixerV3_1(nn.Module):
         self.cfg = cfg
         self.hidden_dim = [64, 128, 256, 512]
         self.patch_size = [4, 2, 2, 2]
-        self.depth = [2, 2, 6, 2]
+        self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 

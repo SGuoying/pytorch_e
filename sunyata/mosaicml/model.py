@@ -5,10 +5,9 @@ from composer.metrics import CrossEntropy
 from composer.models import ComposerClassifier
 from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
-from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg, ViT
-from sunyata.pytorch.arch.conformer import Conformer, Conformer2, Conformer3, Conformer3_1, Conformer3_2, Conformer4, Conformer_1, Conformer_2, Convolution
+from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg
 
-from sunyata.pytorch.arch.convmixer import  BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer
+from sunyata.pytorch.arch.convmixer import  BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, convformer
 from sunyata.pytorch.arch.conv_former import ConvMixerV1, ConvMixerV2, ConvMixerV2_1, ConvMixerV3, ConvMixerV3_1, ConvMixerV4, ConvMixerV3_2, ConvMixerV2_2
 from sunyata.pytorch.arch.convnext import ConvNeXtV2, ConvNeXtV1
 
@@ -49,30 +48,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
     elif model_name == "bayes_convmixer5":
         model = BayesConvMixer5(cfg)
 
-    # elif model_name == "ConvNeXtV2":
-    #     model = ConvNeXtV2(in_chans=3,
-    #                        num_classes=cfg.num_classes,
-    #                        dims=[64, 128, 256, 512])
-
-    elif model_name == "Convolution":
-        model = Convolution(cfg)
-
-    elif model_name == "Conformer":
-        model = Conformer(cfg)
-    elif model_name == "Conformer_1":
-        model = Conformer_1(cfg)
-    elif model_name == "Conformer_2":
-        model = Conformer_2(cfg)
-
-    elif model_name == "Conformer2":
-        model = Conformer2(cfg)
-
-    elif model_name == "Conformer3":
-        model = Conformer3(cfg)
-    elif model_name == "Conformer3_1":
-        model = Conformer3_1(cfg)
-    elif model_name == "Conformer3_2":
-        model = Conformer3_2(cfg)
+    elif model_name == "convformer":
+        model = convformer(cfg)
 
     elif model_name == "ConvMixerV1":
         model = ConvMixerV1(cfg)

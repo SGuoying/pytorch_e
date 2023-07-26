@@ -326,7 +326,7 @@ class ConvMixerV3(BaseModule):
                 self.conv.append(stage)
             else:
                 stage = nn.ModuleList()
-                for j in range(self.depth[i] // self.depth[0]):
+                for _ in range(self.depth[i] // self.depth[0]):
                     stage_j = nn.Sequential(
                         *[block(hidden_dim=self.hidden_dim[i], drop_rate=cfg.drop_rate)
                           for _ in range(self.depth[i]//3)],

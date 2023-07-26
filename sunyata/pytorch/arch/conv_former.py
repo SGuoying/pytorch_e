@@ -314,7 +314,8 @@ class ConvMixerV2(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         self.patch_size = [4, 2, 2, 2]
-        self.depth = [2, 2, 6, 2]
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 
@@ -480,8 +481,8 @@ class ConvMixerV4(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
-        # self.patch_size = [4, 2, 2, 2]
-        self.depth = [2, 2, 6, 2]
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [3, 3, 9, 3]
 
         self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
                                        patch_size=7)
@@ -552,7 +553,8 @@ class ConvMixerV2_1(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.patch_size = [4, 2, 2, 2]
-        self.depth = [2, 2, 6, 2]
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 
@@ -628,7 +630,8 @@ class ConvMixerV2_2(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.patch_size = [4, 2, 2, 2]
-        self.depth = [2, 2, 6, 2]
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 

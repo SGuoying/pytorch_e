@@ -304,7 +304,7 @@ class block(nn.Module):
     def __init__(self, hidden_dim, kernel_size, drop_rate=0.):
         super(block, self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size,groups=hidden_dim,  padding='same'),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim,  padding='same'),
             nn.GELU() 
             )
         self.norm = nn.BatchNorm2d(hidden_dim)

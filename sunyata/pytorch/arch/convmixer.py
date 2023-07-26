@@ -309,7 +309,7 @@ class block(nn.Module):
             )
         self.norm = nn.BatchNorm2d(hidden_dim)
         self.drop = nn.Dropout(drop_rate)
-        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
 
         
     def forward(self, x):

@@ -192,7 +192,7 @@ class block2(nn.Module):
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim), 
             
-                nn.Conv2d(hidden_dim, hidden_dim, 7, groups=hidden_dim, padding="same"),
+                nn.Conv2d(hidden_dim, hidden_dim, 5, groups=hidden_dim, padding="same"),
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim),
             )),
@@ -314,8 +314,8 @@ class ConvMixerV2(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         self.patch_size = [4, 2, 2, 2]
-        # self.depth = [2, 2, 6, 2]
-        self.depth = [3, 3, 9, 3]
+        self.depth = [2, 2, 6, 2]
+        # self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 
@@ -329,14 +329,14 @@ class ConvMixerV2(nn.Module):
         for i in range(4):
             if i != 2:
                 stage = nn.Sequential(
-                    *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+                    *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
                 )
                 self.conv.append(stage)
             else:
                 stage = nn.ModuleList()
                 for j in range(self.depth[i] // self.depth[0]):
                     conv = nn.Sequential(
-                        *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
+                        *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
                     )
                     stage.append(conv)
                 self.conv.append(stage)
@@ -497,14 +497,14 @@ class ConvMixerV4(nn.Module):
             self.attn.append(attn)
             if i != 2:
                 stage = nn.Sequential(
-                    *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+                    *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
                 )
                 self.conv.append(stage)
             else:
                 stage = nn.ModuleList()
-                for j in range(self.depth[i] // self.depth[0]):
+                for _ in range(self.depth[i] // self.depth[0]):
                     conv = nn.Sequential(
-                        *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
+                        *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
                     )
                     stage.append(conv)
                 self.conv.append(stage)
@@ -630,8 +630,8 @@ class ConvMixerV2_2(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.patch_size = [4, 2, 2, 2]
-        # self.depth = [2, 2, 6, 2]
-        self.depth = [3, 3, 9, 3]
+        self.depth = [2, 2, 6, 2]
+        # self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 

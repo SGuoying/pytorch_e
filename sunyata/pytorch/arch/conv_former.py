@@ -83,39 +83,6 @@ class Attention(nn.Module):
         out = rearrange(out, 'b (h n) d -> b n (h d)', h=h)
         return self.to_out(out)
     
-
-class self_Attention(nn.Module):
-    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
-        super().__init__()
-        inner_dim = dim_head *  heads
-        project_out = not (heads == 1 and dim_head == dim)
-
-        self.heads = heads
-        self.scale = dim_head ** -0.5
-
-        self.attend = nn.Softmax(dim = -1)
-        self.dropout = nn.Dropout(dropout)
-
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias = False)
-
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout)
-        ) if project_out else nn.Identity()
-
-    def forward(self, x):
-        qkv = self.to_qkv(x).chunk(3, dim = -1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
-
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
-
-        attn = self.attend(dots)
-        attn = self.dropout(attn)
-
-        out = torch.matmul(attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
-        return self.to_out(out)
-
   
 class transformer(nn.Module):
     def __init__(self, hidden_dim: int, mlp_rate: int, kernel_size: int, drop_rate: float=0.):
@@ -335,7 +302,7 @@ class ConvMixerV2(nn.Module):
                 self.conv.append(stage)
             else:
                 stage = nn.ModuleList()
-                for j in range(self.depth[i] // self.depth[0]):
+                for _ in range(self.depth[i] // self.depth[0]):
                     conv = nn.Sequential(
                         *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
                     )
@@ -489,14 +456,14 @@ class ConvMixerV4(nn.Module):
         self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
                                        patch_size=7)
         self.conv = nn.ModuleList()
-        self.attn = nn.ModuleList([])
+        # self.attn = nn.ModuleList([])
         for i in range(4):
 
             attn = Attention(query_dim=self.hidden_dim,
                              context_dim=self.hidden_dim,
                              heads=1,
                              dim_head=self.hidden_dim,)
-            self.attn.append(attn)
+            # self.attn.append(attn)
             if i != 2:
                 stage = nn.Sequential(
                     *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
@@ -513,6 +480,11 @@ class ConvMixerV4(nn.Module):
 
         count = self.depth[i] // self.depth[0]
         self.count = count
+
+        self.attn = Attention(query_dim=self.hidden_dim,
+                              context_dim=self.hidden_dim,
+                              heads=1,
+                              dim_head=self.hidden_dim,)
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -534,14 +506,16 @@ class ConvMixerV4(nn.Module):
                 x = self.conv[i](x)
                 context = x.permute(0, 2, 3, 1)
                 context = rearrange(context, 'b ... d -> b (...) d')
-                latent = self.attn[i](latent, context) + latent
+                # latent = self.attn[i](latent, context) + latent
+                latent = self.attn(latent, context) + latent
                 latent = self.norm(latent)
             else:
                 for conv in self.conv[i]:
                     x = conv(x)
                     context = x.permute(0, 2, 3, 1)
                     context = rearrange(context, 'b ... d -> b (...) d')
-                    latent = self.attn[i](latent, context) + latent
+                    # latent = self.attn[i](latent, context) + latent
+                    latent = self.attn(latent, context) + latent
                     latent = self.norm(latent)
 
         x = self.digup(x)

@@ -172,6 +172,46 @@ class block2(nn.Module):
         x = self.block(x)
         return x
 
+class ConvMixerV0(nn.Module):
+    def __init__(self, cfg:ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+        self.hidden_dim = cfg.hidden_dim
+        self.patch_size = [4, 2, 2, 2]
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [1, 2, 3, 1]
+        # self.depth = [3, 3, 9, 3]
+
+        self.downsample = nn.ModuleList()
+
+        self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
+                                       patch_size=self.patch_size[0])
+        self.downsample.append(self.patch_embed)
+        for i in range(3):
+            self.downsample.append(PatchEmbed(in_channels=self.hidden_dim, hidden_dim=self.hidden_dim, patch_size=self.patch_size[i+1]))
+
+        self.conv = nn.ModuleList()
+        for i in range(4):
+            stage = nn.Sequential(
+                *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+            )
+            self.conv.append(stage)
+
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.LayerNorm(self.hidden_dim),
+        )
+        self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
+
+    def forward(self, x):
+        for i in range(4):
+            x = self.downsample[i](x)
+            x = self.conv[i](x)
+
+        x = self.digup(x)
+        return self.fc(x)
+    
 class ConvMixerV1(nn.Module):
     '''
     ConvNeXt-T: C = (96, 192, 384, 768), B = (3, 3, 9, 3)

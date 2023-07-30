@@ -524,6 +524,94 @@ class ConvMixerV4(nn.Module):
     
 
 class ConvMixerV2_1(nn.Module):
+    # def __init__(self, cfg:ConvMixerCfg):
+    #     super().__init__()
+    #     self.cfg = cfg
+    #     self.hidden_dim = cfg.hidden_dim
+    #     # self.patch_size = [4, 2, 2, 2]
+    #     # self.depth = [2, 2, 6, 2]
+    #     self.depth = [1, 2, 3, 1]
+
+    #     self.downsample = nn.ModuleList()
+
+    #     self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
+    #                                    patch_size=7)
+    #     # self.downsample.append(self.patch_embed)
+    #     # for i in range(3):
+    #     #     self.downsample.append(PatchEmbed(in_channels=self.hidden_dim, hidden_dim=self.hidden_dim, patch_size=2))
+
+    #     self.conv = nn.ModuleList()
+    #     self.attn = nn.ModuleList([])
+    #     for i in range(4):
+
+    #         attn = Attention(query_dim=self.hidden_dim,
+    #                          context_dim=self.hidden_dim,
+    #                          heads=1,
+    #                          dim_head=self.hidden_dim,)
+    #         self.attn.append(attn)
+    #         # if i != 2:
+    #         #     stage = nn.Sequential(
+    #         #         *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+    #         #     )
+    #         #     self.conv.append(stage)
+    #         # else:
+    #         #     stage = nn.ModuleList()
+    #         #     for j in range(self.depth[i] // self.depth[0]):
+    #         #         conv = nn.Sequential(
+    #         #             *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
+    #         #         )
+    #         #         stage.append(conv)
+    #         #     self.conv.append(stage)
+    #         conv1 = nn.ModuleList([])
+    #         for _ in range(self.depth[i]):
+    #             conv2 = block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
+    #             conv1.append(conv2)
+    #         self.conv.append(conv1)
+
+    #     count = self.depth[i] // self.depth[0]
+    #     self.count = count
+
+    #     self.digup = nn.Sequential(
+    #         nn.AdaptiveAvgPool2d((1, 1)),
+    #         nn.Flatten(),
+    #         nn.LayerNorm(self.hidden_dim),
+    #     )
+    #     self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
+    #     self.norm = nn.LayerNorm(self.hidden_dim)
+    #     self.latent = nn.Parameter(torch.randn(1, self.hidden_dim))
+
+    # def forward(self, x):
+    #     B, _, H, W = x.shape
+    #     latent = repeat(self.latent, 'n d -> b n d', b=B)
+
+    #     x = self.patch_embed(x)
+
+    #     for i in range(4):
+    #         # if i != 2:
+    #         #     x = self.downsample[i](x)
+    #         #     x = self.conv[i](x)
+    #         #     context = x.permute(0, 2, 3, 1)
+    #         #     context = rearrange(context, 'b ... d -> b (...) d')
+    #         #     latent = self.attn[i](latent, context) + latent
+    #         #     latent = self.norm(latent)
+    #         # else:
+    #         #     x = self.downsample[i](x)
+    #         #     for conv in self.conv[i]:
+    #         #         x = conv(x)
+    #         #         context = x.permute(0, 2, 3, 1)
+    #         #         context = rearrange(context, 'b ... d -> b (...) d')
+    #         #         latent = self.attn[i](latent, context) + latent
+    #         #         latent = self.norm(latent)
+    #         for conv in self.conv[i]:
+    #             x = conv(x)
+    #             context = x.permute(0, 2, 3, 1)
+    #             context = rearrange(context, 'b ... d -> b (...) d')
+    #             latent = self.attn[i](latent, context) + latent
+    #             latent = self.norm(latent)
+
+    #     x = self.digup(x)
+    #     latent = reduce(latent, 'b n d -> b d', 'mean')
+    #     return self.fc(latent + x)
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__()
         self.cfg = cfg
@@ -531,37 +619,26 @@ class ConvMixerV2_1(nn.Module):
         # self.patch_size = [4, 2, 2, 2]
         # self.depth = [2, 2, 6, 2]
         self.depth = [1, 2, 3, 1]
+        # self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
 
         self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
-                                       patch_size=7)
-        # self.downsample.append(self.patch_embed)
-        # for i in range(3):
-        #     self.downsample.append(PatchEmbed(in_channels=self.hidden_dim, hidden_dim=self.hidden_dim, patch_size=2))
+                                       patch_size=4)
+        self.downsample.append(self.patch_embed)
+        for i in range(3):
+            self.downsample.append(PatchEmbed(in_channels=self.hidden_dim, hidden_dim=self.hidden_dim, patch_size=2))
 
-        self.conv = nn.ModuleList()
-        self.attn = nn.ModuleList([])
+        self.conv = nn.ModuleList([])
+        # self.attn = nn.ModuleList([])
         for i in range(4):
 
-            attn = Attention(query_dim=self.hidden_dim,
-                             context_dim=self.hidden_dim,
-                             heads=1,
-                             dim_head=self.hidden_dim,)
-            self.attn.append(attn)
-            # if i != 2:
-            #     stage = nn.Sequential(
-            #         *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
-            #     )
-            #     self.conv.append(stage)
-            # else:
-            #     stage = nn.ModuleList()
-            #     for j in range(self.depth[i] // self.depth[0]):
-            #         conv = nn.Sequential(
-            #             *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
-            #         )
-            #         stage.append(conv)
-            #     self.conv.append(stage)
+            # attn = Attention(query_dim=self.hidden_dim,
+            #                  context_dim=self.hidden_dim,
+            #                  heads=1,
+            #                  dim_head=self.hidden_dim,)
+            # self.attn.append(attn)
+
             conv1 = nn.ModuleList([])
             for _ in range(self.depth[i]):
                 conv2 = block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
@@ -570,6 +647,11 @@ class ConvMixerV2_1(nn.Module):
 
         count = self.depth[i] // self.depth[0]
         self.count = count
+
+        self.attn = Attention(query_dim=self.hidden_dim,
+                              context_dim=self.hidden_dim,
+                              heads=1,
+                              dim_head=self.hidden_dim,)
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -584,29 +666,13 @@ class ConvMixerV2_1(nn.Module):
         B, _, H, W = x.shape
         latent = repeat(self.latent, 'n d -> b n d', b=B)
 
-        x = self.patch_embed(x)
-
         for i in range(4):
-            # if i != 2:
-            #     x = self.downsample[i](x)
-            #     x = self.conv[i](x)
-            #     context = x.permute(0, 2, 3, 1)
-            #     context = rearrange(context, 'b ... d -> b (...) d')
-            #     latent = self.attn[i](latent, context) + latent
-            #     latent = self.norm(latent)
-            # else:
-            #     x = self.downsample[i](x)
-            #     for conv in self.conv[i]:
-            #         x = conv(x)
-            #         context = x.permute(0, 2, 3, 1)
-            #         context = rearrange(context, 'b ... d -> b (...) d')
-            #         latent = self.attn[i](latent, context) + latent
-            #         latent = self.norm(latent)
+            x = self.downsample[i](x)
             for conv in self.conv[i]:
                 x = conv(x)
                 context = x.permute(0, 2, 3, 1)
                 context = rearrange(context, 'b ... d -> b (...) d')
-                latent = self.attn[i](latent, context) + latent
+                latent = self.attn(latent, context) + latent
                 latent = self.norm(latent)
 
         x = self.digup(x)

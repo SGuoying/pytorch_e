@@ -389,7 +389,8 @@ class ConvMixerV2(nn.Module):
 
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')
-        return self.fc(latent + x)
+        # return self.fc(latent + x)
+        return self.fc(latent)
     
 class ConvMixerV3(nn.Module):
     def __init__(self, cfg: ConvMixerCfg):
@@ -717,7 +718,8 @@ class ConvMixerV2_1(nn.Module):
 
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')
-        return self.fc(latent + x)
+        # return self.fc(latent + x)
+        return self.fc(latent)
     
 class ConvMixerV2_2(nn.Module):
     def __init__(self, cfg:ConvMixerCfg):

@@ -34,25 +34,6 @@ class Residual(nn.Module):
     
 
 
-class Mlp(nn.Module):
-    def __init__(self, hidden_dim: int, mlp_rate: int, act_layer=nn.GELU, drop=0.):
-        super().__init__()
-        
-        hidden_features = hidden_dim * mlp_rate     
-        self.fc1 = nn.Linear(hidden_dim, hidden_features)
-        self.act = act_layer()
-        self.fc2 = nn.Linear(hidden_features, hidden_dim)
-        self.drop = nn.Dropout(drop)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
-
-
 class Attention(nn.Module):
     def __init__(self, 
                  query_dim, context_dim=None,
@@ -82,33 +63,6 @@ class Attention(nn.Module):
         out = torch.einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, 'b (h n) d -> b n (h d)', h=h)
         return self.to_out(out)
-    
-  
-class transformer(nn.Module):
-    def __init__(self, hidden_dim: int, mlp_rate: int, kernel_size: int, drop_rate: float=0.):
-        super().__init__()
-        self.norm1 = nn.LayerNorm(hidden_dim)
-        self.attn = Attention(
-            query_dim=hidden_dim,
-            context_dim=hidden_dim,
-            heads=1,
-            dim_head=hidden_dim,
-        )
-        # self.attn = self_Attention(
-        #     dim=hidden_dim, 
-        #     heads=1, 
-        #     dim_head=hidden_dim
-        #     )
-        self.norm2 = nn.LayerNorm(hidden_dim)
-        self.mlp = Mlp(hidden_dim=hidden_dim, mlp_rate=mlp_rate, drop=drop_rate)
-        self.drop = nn.Dropout(drop_rate)
-
-    def forward(self, x, context=None):
-        context = context if context is not None else x
-        x = self.drop(self.attn(self.norm1(x), context=context)) + x
-        # x = self.drop(self.attn(self.norm1(x))) + x
-        x = self.drop(self.mlp(self.norm2(x))) + x
-        return x
     
 
 class PatchEmbed(nn.Module):
@@ -398,7 +352,7 @@ class ConvMixerV3(nn.Module):
         self.cfg = cfg
         self.hidden_dim = [64, 128, 256, 512]
         # self.patch_size = [4, 2, 2, 2]
-        self.depth = [2, 2, 6, 2]
+        self.depth = [1, 2, 3, 1]
 
         self.downsample = nn.ModuleList()
 
@@ -414,13 +368,13 @@ class ConvMixerV3(nn.Module):
         self.norm = nn.ModuleList([])
         for i in range(4):
 
-            attn = Attention(query_dim=self.hidden_dim[i],
+            attn = Attention(query_dim=self.hidden_dim[-1],
                              context_dim=self.hidden_dim[i],
                              heads=1,
-                             dim_head=self.hidden_dim[i],)
+                             dim_head=self.hidden_dim[-1],)
             self.attn.append(attn)
 
-            norm = nn.LayerNorm(self.hidden_dim[i])
+            norm = nn.LayerNorm(self.hidden_dim[-1])
             self.norm.append(norm)
 
             if i != 2:
@@ -439,16 +393,6 @@ class ConvMixerV3(nn.Module):
                 self.conv.append(stage)
 
         self.count = self.depth[2] // self.depth[0]
-
-        self.upsample = nn.ModuleList()
-        
-        for i in range(3):
-            upsample = nn.Sequential(
-                nn.Linear(self.hidden_dim[i], self.hidden_dim[i+1]),
-                nn.LayerNorm(self.hidden_dim[i+1])
-            )
-            self.upsample.append(upsample)
-        self.upsample.append(nn.Identity())
 
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -470,7 +414,7 @@ class ConvMixerV3(nn.Module):
                 context = rearrange(context, 'b ... d -> b (...) d')
                 latent = self.attn[i](latent, context) + latent
                 latent = self.norm[i](latent)
-                latent = self.upsample[i](latent)
+
             else:
                 x = self.downsample[i](x)
                 for conv in self.conv[i]:
@@ -479,11 +423,10 @@ class ConvMixerV3(nn.Module):
                     context = rearrange(context, 'b ... d -> b (...) d')
                     latent = self.attn[i](latent, context) + latent
                     latent = self.norm[i](latent)
-                latent = self.upsample[i](latent)
 
-        x = self.digup(x)
+        # x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')
-        return self.fc(latent + x)
+        return self.fc(latent)
     
 class ConvMixerV4(nn.Module):
     def __init__(self, cfg:ConvMixerCfg):

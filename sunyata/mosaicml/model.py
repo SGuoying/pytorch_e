@@ -63,6 +63,8 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = ConvMixerV2_1(cfg)
     elif model_name == "ConvMixerV2_2":
         model = ConvMixerV2_2(cfg)
+    elif model_name == "ConvMixerV3":
+        model = ConvMixerV3(cfg)
     elif model_name == "ConvMixerV3_1":
         model = ConvMixerV3_1(cfg)
     elif model_name == "ConvMixerV3_2":

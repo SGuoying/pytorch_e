@@ -1,9 +1,11 @@
+# %%
+from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
 
-
+# %%
 class EfficientChannelAttention(nn.Module):
     """
     Efficient Channel Attention (ECA) layer.
@@ -30,8 +32,13 @@ class EfficientChannelAttention(nn.Module):
 
 # %%
 class SelfAttention(nn.Module):
-    def __init__(self, hidden_dim: int, num_heads: int, scale: float=None, dropout=0.,
-                 is_mask=True, is_softmax=True, fore_mask=True):
+    def __init__(
+            self, 
+            hidden_dim: int, 
+            num_heads: int, 
+            scale: Optional[float]=None, 
+            dropout=0.,
+            is_mask=True, is_softmax=True, fore_mask=True):
         super().__init__()
         head_dim = hidden_dim // num_heads
         assert head_dim * num_heads == hidden_dim, "hidden_dim must be divisible by num_heads"
@@ -104,7 +111,7 @@ class Attention(nn.Module):
     Refs:
     https://github.com/lucidrains/perceiver-pytorch/
     """
-    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, scale=None, dropout=0.):
 
         super().__init__()
         inner_dim = dim_head * heads
@@ -112,7 +119,7 @@ class Attention(nn.Module):
 
         context_dim = context_dim if context_dim is not None else query_dim
 
-        self.scale = dim_head ** -0.5
+        self.scale = dim_head ** -0.5 if scale is None else scale # / 10.
         self.heads = heads
 
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)

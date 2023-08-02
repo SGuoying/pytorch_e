@@ -2,7 +2,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+import torch_optimizer
 
 from sunyata.pytorch.arch.base import BaseCfg, RevSGD
 
@@ -28,14 +29,17 @@ class BaseModule(pl.LightningModule):
         elif self.cfg.optimizer_method == "SGD":
             optimizer = torch.optim.SGD(self.parameters(), lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         elif self.cfg.optimizer_method == "Adam":
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.cfg.learning_rate)
+            optimizer = torch.optim.Adam(self.parameters(), lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         elif self.cfg.optimizer_method == "AdamW":
             optimizer = torch.optim.AdamW(
-                [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
+                self.parameters(),
+                # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
+        elif self.cfg.optimizer_method == "Lamb":
+            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
-            raise Exception("Only supportSGD, Adam and AdamW optimizer till now.")
+            raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 
         if self.cfg.learning_rate_scheduler == "CosineAnnealing":
             lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, self.cfg.num_epochs, last_epoch=self.cfg.last_epoch)

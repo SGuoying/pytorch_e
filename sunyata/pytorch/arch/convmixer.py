@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sunyata.pytorch.arch.base import BaseCfg, ConvMixerLayer, ConvMixerLayer2, Residual, ecablock
+from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, Residual, ecablock
 from sunyata.pytorch.layer.attention import Attention, AttentionWithoutParams, EfficientChannelAttention
 
 
@@ -303,23 +303,19 @@ class BayesConvMixer5(ConvMixer):
 class block(nn.Module):
     def __init__(self, hidden_dim, kernel_size, drop_rate=0.):
         super(block, self).__init__()
-        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim,  padding='same')
+        self.conv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim,  padding='same')
         self.act = nn.GELU() 
-        self.norm1 = nn.BatchNorm2d(hidden_dim)
-        self.drop = nn.Dropout(drop_rate)
-        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
-        self.conv1 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1)
-        self.norm2 = nn.BatchNorm2d(hidden_dim)
+        self.norm = nn.BatchNorm2d(hidden_dim)
+        self.se = SE(hidden_dim)
 
         
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
+        y = x
+        x = self.conv(x)
         x = self.act(x)
-        x = self.norm1(x)
-        x = self.drop(x)
-        x = self.conv2(x)
-        x = self.norm2(x)
+        x = self.norm(x)
+        y = self.se(y)
+        x = x + y
         return x
     
 class mlp(nn.Module):

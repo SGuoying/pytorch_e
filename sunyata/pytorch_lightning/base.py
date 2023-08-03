@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-import torch_optimizer
+# import torch_optimizer
 
 from sunyata.pytorch.arch.base import BaseCfg, RevSGD
 
@@ -36,8 +36,8 @@ class BaseModule(pl.LightningModule):
                 # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
-        elif self.cfg.optimizer_method == "Lamb":
-            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
+        # elif self.cfg.optimizer_method == "Lamb":
+        #     optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
             raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 

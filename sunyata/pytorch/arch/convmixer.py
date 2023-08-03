@@ -303,15 +303,15 @@ class BayesConvMixer5(ConvMixer):
 class block(nn.Module):
     def __init__(self, hidden_dim, kernel_size, drop_rate=0.):
         super(block, self).__init__()
-        self.conv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim,  padding='same')
-        self.act = nn.GELU() 
-        self.norm = nn.BatchNorm2d(hidden_dim)
+        # self.conv = nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim,  padding='same')
+        # self.act = nn.GELU() 
+        # self.norm = nn.BatchNorm2d(hidden_dim)
         self.se = SE(hidden_dim)
 
         
     def forward(self, x):
-        x = self.conv(x)
-        x = self.act(x)
+        # x = self.conv(x)
+        # x = self.act(x)
         # x = self.norm(x)
         x = self.se(x)
         return x

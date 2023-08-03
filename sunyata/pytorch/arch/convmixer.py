@@ -79,25 +79,48 @@ class ConvMixer2(ConvMixer):
 
 
 # %%
-class MeanConvMixer(ConvMixer):
+class EcaConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1,1)),
-            nn.Flatten(),
-        )
+        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
 
     def forward(self, x):
         x = self.embed(x)
+
         logits = self.digup(x)
+        logits = self.norm(logits)
+
         for layer in self.layers:
             x = x + layer(x)
             logits = logits + self.digup(x)
-        logits = self.fc(logits / (self.cfg.num_layers + 1))
+            logits = self.norm(logits)
+        logits = self.fc(logits)
         return logits
 
+# %%
+class EcaConvMixer2(ConvMixer2):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
+
+    def forward(self, x):
+        x = self.embed(x)
+
+        logits = self.digup(x)
+        logits = self.norm(logits)
+
+        for layer in self.layers:
+            x = layer(x)
+            logits = logits + self.digup(x)
+            logits = self.norm(logits)
+        logits = self.fc(logits)
+        return logits
 
 # %%
 class IterConvMixer(ConvMixer):

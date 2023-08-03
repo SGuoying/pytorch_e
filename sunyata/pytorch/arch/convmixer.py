@@ -361,8 +361,11 @@ class formerblock(nn.Module):
         self.norm2 = nn.BatchNorm2d(hidden_dim)
 
     def forward(self, x):
-        x = self.norm1(x + self.drop(self.block(x)))    
-        x = self.norm2(x + self.drop(self.mlp(x)))
+        # x = self.norm1(x + self.drop(self.block(x)))    
+        # x = self.norm2(x + self.drop(self.mlp(x)))
+        x = x + self.block(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
+        x = self.drop(x)
 
         return x
     

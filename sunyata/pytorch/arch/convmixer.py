@@ -310,12 +310,10 @@ class block(nn.Module):
 
         
     def forward(self, x):
-        y = x
         x = self.conv(x)
         x = self.act(x)
-        x = self.norm(x)
-        y = self.se(y)
-        x = x + y
+        # x = self.norm(x)
+        x = self.se(x)
         return x
     
 class mlp(nn.Module):

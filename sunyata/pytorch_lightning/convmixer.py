@@ -36,18 +36,18 @@ class PlConvMixer2(ClassifierModule):
 
 
 # %%
-class PlMEcaConvMixer(ClassifierModule):
+class PlEcaConvMixer(ClassifierModule):
     def __init__(self, cfg:ConvMixerCfg):
-        super(PlMEcaConvMixer, self).__init__(cfg)
+        super(PlEcaConvMixer, self).__init__(cfg)
         self.convmixer = EcaConvMixer(cfg)
     
     def forward(self, x):
         return self.convmixer(x)
     
 # %%
-class PlMEcaConvMixer2(ClassifierModule):
+class PlEcaConvMixer2(ClassifierModule):
     def __init__(self, cfg:ConvMixerCfg):
-        super(PlMEcaConvMixer2, self).__init__(cfg)
+        super(PlEcaConvMixer2, self).__init__(cfg)
         self.convmixer = EcaConvMixer2(cfg)
     
     def forward(self, x):

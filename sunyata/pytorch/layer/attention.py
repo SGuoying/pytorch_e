@@ -38,7 +38,7 @@ class SelfAttention(nn.Module):
             num_heads: int, 
             scale: Optional[float]=None, 
             dropout=0.,
-            is_mask=True, is_softmax=True, fore_mask=True):
+            is_mask=False, is_softmax=False, fore_mask=False):
         super().__init__()
         head_dim = hidden_dim // num_heads
         assert head_dim * num_heads == hidden_dim, "hidden_dim must be divisible by num_heads"

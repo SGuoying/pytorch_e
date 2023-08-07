@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from sunyata.pytorch.arch.base import SE, BaseCfg, ConvMixerLayer, ConvMixerLayer2, Residual
-from sunyata.pytorch.layer.attention import Attention, AttentionWithoutParams, EfficientChannelAttention
+from sunyata.pytorch.layer.attention import Attention, AttentionWithoutParams, EfficientChannelAttention, SelfAttention
 from torch import einsum
 from einops import rearrange, reduce, repeat
 
@@ -79,47 +79,64 @@ class ConvMixer2(ConvMixer):
 
 
 # %%
-class EcaConvMixer(ConvMixer):
+class Self_ConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
-        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
+        self.digup = SelfAttention(hidden_dim=cfg.hidden_dim,
+                                   num_heads=1,
+                                   )
+        
+        # self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.norm = nn.LayerNorm(cfg.hidden_dim)
 
     def forward(self, x):
-        x = self.embed(x)
+        batch_size, _, _, _ = x.shape
+        # latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
 
-        logits = self.digup(x)
-        logits = self.norm(logits)
+        x = self.embed(x)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = self.digup(input)
+        latent = self.norm(latent)
 
         for layer in self.layers:
             x = x + layer(x)
-            logits = logits + self.digup(x)
-            logits = self.norm(logits)
-        logits = self.fc(logits)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = latent + self.digup(input)
+            latent = self.norm(latent)
+
+        logits = self.fc(latent)
         return logits
 
 # %%
-class EcaConvMixer2(ConvMixer2):
+class Self_ConvMixer2(ConvMixer2):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)
 
-        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
+        self.digup =  SelfAttention(hidden_dim=cfg.hidden_dim,
+                                   num_heads=1,
+                                   )
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.norm = nn.LayerNorm(cfg.hidden_dim)
 
     def forward(self, x):
         x = self.embed(x)
 
-        logits = self.digup(x)
-        logits = self.norm(logits)
+        input = x.permute(0, 2, 3, 1)
+        input = rearrange(input, 'b ... d -> b (...) d')
+        latent = self.digup(input)
+        latent = self.norm(latent)
 
         for layer in self.layers:
             x = layer(x)
-            logits = logits + self.digup(x)
-            logits = self.norm(logits)
-        logits = self.fc(logits)
+            input = x.permute(0, 2, 3, 1)
+            input = rearrange(input, 'b ... d -> b (...) d')
+            latent = latent + self.digup(input)
+            latent = self.norm(latent)
+        logits = self.fc(latent)
         return logits
 
 # %%

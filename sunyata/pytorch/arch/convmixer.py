@@ -107,7 +107,8 @@ class Self_ConvMixer(ConvMixer):
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = latent + self.digup(input)
             latent = self.norm(latent)
-
+        
+        latent = latent.mean(dim=1)
         logits = self.fc(latent)
         return logits
 
@@ -136,6 +137,7 @@ class Self_ConvMixer2(ConvMixer2):
             input = rearrange(input, 'b ... d -> b (...) d')
             latent = latent + self.digup(input)
             latent = self.norm(latent)
+        latent = latent.mean(dim=1)
         logits = self.fc(latent)
         return logits
 

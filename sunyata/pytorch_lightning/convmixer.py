@@ -11,7 +11,7 @@ from sunyata.pytorch_lightning.base import BaseModule, ClassifierModule
 from sunyata.pytorch.arch.convmixer import (ConvMixer, ConvMixerCfg, ConvMixer2,
                                             IterAttnConvMixer, IterConvMixer, 
                                             IterConvMixer2, IterAttnConvMixer2,
-                                            EcaConvMixer,EcaConvMixer2)
+                                            )
 
 from sunyata.pytorch.arch.bayes.core import log_bayesian_iteration
 
@@ -30,25 +30,6 @@ class PlConvMixer2(ClassifierModule):
     def __init__(self, cfg:ConvMixerCfg):
         super(PlConvMixer2, self).__init__(cfg)
         self.convmixer = ConvMixer2(cfg)
-    
-    def forward(self, x):
-        return self.convmixer(x)
-
-
-# %%
-class PlEcaConvMixer(ClassifierModule):
-    def __init__(self, cfg:ConvMixerCfg):
-        super(PlEcaConvMixer, self).__init__(cfg)
-        self.convmixer = EcaConvMixer(cfg)
-    
-    def forward(self, x):
-        return self.convmixer(x)
-    
-# %%
-class PlEcaConvMixer2(ClassifierModule):
-    def __init__(self, cfg:ConvMixerCfg):
-        super(PlEcaConvMixer2, self).__init__(cfg)
-        self.convmixer = EcaConvMixer2(cfg)
     
     def forward(self, x):
         return self.convmixer(x)

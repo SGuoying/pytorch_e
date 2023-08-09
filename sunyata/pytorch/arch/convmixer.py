@@ -19,7 +19,7 @@ class ConvMixerCfg(BaseCfg):
     patch_size: int = 2
     num_classes: int = 10
 
-    depth: list = [1, 2, 3, 1]
+    depth = [1, 2, 3, 1]
 
 
     scale: Optional[float] = None

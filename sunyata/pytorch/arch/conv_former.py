@@ -18,7 +18,7 @@ class ConvMixerCfg(BaseCfg):
 
     scale: Optional[float] = None
 
-    depth: list = None
+    depth = [1, 2, 3, 1]
 
     drop_rate: float = 0.
     mlp_rate: int = 4

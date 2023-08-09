@@ -259,15 +259,6 @@ ConvNeXt-XL: C = (256, 512, 1024, 2048), B = (3, 3, 27, 3)
                     context = rearrange(context, 'b ... d -> b (...) d')
                     latent = self.attn(latent, context) + latent
                     latent = self.norm(latent)
-                # for j in range(self.count):
-                #     x = self.conv[i][j](x)
-                #     context = self.upsample[i](x)
-                #     print(j)
-                #     context = context.permute(0, 2, 3, 1)
-                #     context = rearrange(context, 'b ... d -> b (...) d')
-                #     latent = self.attn(latent, context) + latent
-                #     latent = self.norm(latent)
-
         x = self.digup(x)
         latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.fc(latent + x)
@@ -278,7 +269,6 @@ class ConvMixerV2(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         self.patch_size = [4, 2, 2, 2]
-        # self.depth = [2, 2, 6, 2]
         self.depth = [1, 2, 3, 1]
         # self.depth = [3, 3, 9, 3]
 
@@ -292,33 +282,18 @@ class ConvMixerV2(nn.Module):
 
         self.conv = nn.ModuleList()
         for i in range(4):
-            if i != 2:
-                stage = nn.Sequential(
-                    *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+            conv = nn.ModuleList([])
+            for _ in range(self.depth[i]):
+                conv.append(
+                    block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
                 )
-                self.conv.append(stage)
-            else:
-                stage = nn.ModuleList()
-                for _ in range(self.depth[i] // self.depth[0]):
-                    conv = nn.Sequential(
-                        *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i] //3)]
-                    )
-                    stage.append(conv)
-                self.conv.append(stage)
-
-        count = self.depth[i] // self.depth[0]
-        self.count = count
+            self.conv.append(conv)
 
         self.attn = Attention(query_dim=self.hidden_dim,
                               context_dim=self.hidden_dim,
                               heads=1,
                               dim_head=self.hidden_dim,)
-
-        self.digup = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten(),
-            nn.LayerNorm(self.hidden_dim),
-        )
+        
         self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
         self.norm = nn.LayerNorm(self.hidden_dim)
         self.latent = nn.Parameter(torch.randn(1, self.hidden_dim))
@@ -328,25 +303,15 @@ class ConvMixerV2(nn.Module):
         latent = repeat(self.latent, 'n d -> b n d', b=B)
 
         for i in range(4):
-            if i != 2:
-                x = self.downsample[i](x)
-                x = self.conv[i](x)
+            x = self.downsample[i](x)
+            for conv in self.conv[i]:
+                x = conv(x)
                 context = x.permute(0, 2, 3, 1)
                 context = rearrange(context, 'b ... d -> b (...) d')
                 latent = self.attn(latent, context) + latent
                 latent = self.norm(latent)
-            else:
-                x = self.downsample[i](x)
-                for conv in self.conv[i]:
-                    x = conv(x)
-                    context = x.permute(0, 2, 3, 1)
-                    context = rearrange(context, 'b ... d -> b (...) d')
-                    latent = self.attn(latent, context) + latent
-                    latent = self.norm(latent)
-
-        x = self.digup(x)
-        latent = reduce(latent, 'b n d -> b d', 'mean')
-        # return self.fc(latent + x)
+        latent = nn.Flatten()(latent)
+        # latent = reduce(latent, 'b n d -> b d', 'mean')
         return self.fc(latent)
     
 class ConvMixerV3(nn.Module):
@@ -1023,8 +988,7 @@ class PatchConvMixerV0(nn.Module):
         for i in range(4):
             x = self.downsample[i](x)
             for conv in self.conv[i]:
-                x = conv(x)
-                
+                x = conv(x)        
         x = self.digup(x)
         logits = self.fc(x)
         return logits
@@ -1084,6 +1048,7 @@ class PatchConvMixerV1(nn.Module):
                 latent = self.attn(latent, context) + latent
                 latent = self.norm(latent)
 
-        latent = reduce(latent, 'b n d -> b d', 'mean')
+        # latent = reduce(latent, 'b n d -> b d', 'mean')
+        latent = nn.Flatten()(latent)
         logits = self.fc(latent)
         return logits

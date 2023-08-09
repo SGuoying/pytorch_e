@@ -16,6 +16,8 @@ class ConvMixerCfg(BaseCfg):
     patch_size: int = 2
     num_classes: int = 10
 
+    depth: list = None
+
     drop_rate: float = 0.
     mlp_rate: int = 4
 
@@ -975,7 +977,7 @@ class PatchMerging(nn.Module):
         x2 = x[:, :, 0::2, 1::2]    # B H/2 W/2 C
         x3 = x[:, :, 1::2, 1::2]    # B H/2 W/2 C
 
-        x = torch.cat([x0, x1, x2, x3], 1)
+        x = torch.cat([x0, x1, x2, x3], dim=1)
         x = self.norm(x)
 
         x = self.reduction(x)
@@ -989,7 +991,7 @@ class PatchConvMixerV0(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.depth = [2, 2, 6, 2]
-        self.depth = [1, 2, 3, 1]
+        self.depth = cfg.depth
         # self.depth = [3, 3, 9, 3]
         self.downsample = nn.ModuleList()
 
@@ -1033,7 +1035,7 @@ class PatchConvMixerV1(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.depth = [2, 2, 6, 2]
-        self.depth = [1, 2, 3, 1]
+        self.depth = cfg.depth
         # self.depth = [3, 3, 9, 3]
         self.downsample = nn.ModuleList()
 

@@ -1,4 +1,4 @@
-
+from typing import Optional
 from dataclasses import dataclass
 from einops import rearrange, reduce, repeat
 import torch
@@ -15,6 +15,8 @@ class ConvMixerCfg(BaseCfg):
     kernel_size: int = 5
     patch_size: int = 2
     num_classes: int = 10
+
+    scale: Optional[float] = None
 
     depth: list = None
 
@@ -39,14 +41,15 @@ class Residual(nn.Module):
 class Attention(nn.Module):
     def __init__(self, 
                  query_dim, context_dim=None,
-                 heads=8, dim_head=64, dropout=0.):
+                 heads=8, dim_head=64, scale=None, dropout=0.):
         super().__init__()
         context_dim = context_dim or query_dim
         inner_dim = dim_head * heads
         project_out = not (inner_dim == query_dim and heads == 1)
 
         self.heads = heads
-        self.scale = dim_head ** -0.5
+        # self.scale = dim_head ** -0.5
+        self.scale = dim_head ** -0.5 if scale is None else scale
         self.dropout = nn.Dropout(dropout)
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias=False)
@@ -1058,7 +1061,8 @@ class PatchConvMixerV1(nn.Module):
         self.attn = Attention(query_dim=self.hidden_dim,
                               context_dim=self.hidden_dim,
                               heads=1,
-                              dim_head=self.hidden_dim,)
+                              dim_head=self.hidden_dim,
+                              scale=cfg.scale)
         self.digup = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),

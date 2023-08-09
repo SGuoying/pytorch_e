@@ -148,7 +148,7 @@ class ConvMixerV0(nn.Module):
         self.conv = nn.ModuleList()
         for i in range(4):
             stage = nn.Sequential(
-                *[block2(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+                *[block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size ,drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
             )
             self.conv.append(stage)
 

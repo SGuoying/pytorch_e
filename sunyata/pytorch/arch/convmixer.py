@@ -79,69 +79,6 @@ class ConvMixer2(ConvMixer):
 
 
 # %%
-class Self_ConvMixer(ConvMixer):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
-
-        self.digup = SelfAttention(hidden_dim=cfg.hidden_dim,
-                                   num_heads=1,
-                                   )
-        
-        # self.latent = nn.Parameter(torch.randn(1, cfg.hidden_dim))
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.norm = nn.LayerNorm(cfg.hidden_dim)
-
-    def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        # latent = repeat(self.latent, 'n d -> b n d', b = batch_size)
-
-        x = self.embed(x)
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = self.digup(input)
-        latent = self.norm(latent)
-
-        for layer in self.layers:
-            x = x + layer(x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            latent = latent + self.digup(input)
-            latent = self.norm(latent)
-        
-        latent = latent.mean(dim=1)
-        logits = self.fc(latent)
-        return logits
-
-# %%
-class Self_ConvMixer2(ConvMixer2):
-    def __init__(self, cfg: ConvMixerCfg):
-        super().__init__(cfg)
-
-        self.digup =  SelfAttention(hidden_dim=cfg.hidden_dim,
-                                   num_heads=1,
-                                   )
-        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
-        self.norm = nn.LayerNorm(cfg.hidden_dim)
-
-    def forward(self, x):
-        x = self.embed(x)
-
-        input = x.permute(0, 2, 3, 1)
-        input = rearrange(input, 'b ... d -> b (...) d')
-        latent = self.digup(input)
-        latent = self.norm(latent)
-
-        for layer in self.layers:
-            x = layer(x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            latent = latent + self.digup(input)
-            latent = self.norm(latent)
-        latent = latent.mean(dim=1)
-        logits = self.fc(latent)
-        return logits
-
-# %%
 class IterConvMixer(ConvMixer):
     def __init__(self, cfg: ConvMixerCfg):
         super().__init__(cfg)

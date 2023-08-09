@@ -958,7 +958,127 @@ class ConvMixerV3_2(nn.Module):
 
 
 
+class PatchMerging(nn.Module):
+    def __init__(self, hidden_dim, norm_layer=nn.BatchNorm2d):
+        super().__init__()
 
+        self.hidden_dim = hidden_dim
+        self.reduction = nn.Conv2d(4 * hidden_dim, hidden_dim, kernel_size=1)
+        self.norm = norm_layer(4 * hidden_dim)
 
+    def forward(self, x):
+        B, C, H, W = x.shape
+        assert H % 2 == 0 and W % 2 == 0, f"x size ({H}*{W}) are not even."
 
+        x0 = x[:, 0::2, 0::2, :]  # B H/2 W/2 C
+        x1 = x[:, 1::2, 0::2, :]  # B H/2 W/2 C
+        x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
+        x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
+        x = torch.cat([x0, x1, x2, x3], -1)
+        x = self.norm(x)
 
+        x = self.reduction(x)
+
+        return x
+    
+
+class PatchConvMixerV0(nn.Module):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+        self.hidden_dim = cfg.hidden_dim
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [1, 2, 3, 1]
+        # self.depth = [3, 3, 9, 3]
+        self.downsample = nn.ModuleList()
+
+        self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
+                                       patch_size=4)
+        self.downsample.append(self.patch_embed)
+        for i in range(3):
+            self.downsample.append(
+                PatchMerging(hidden_dim=self.hidden_dim))
+            
+        self.conv = nn.ModuleList()
+        for i in range(4):
+            conv = nn.ModuleList([])
+            for _ in range(self.depth[i]):
+                conv.append(
+                    block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
+                )
+            self.conv.append(conv)
+
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.LayerNorm(self.hidden_dim),
+        )
+        self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
+
+    def forward(self, x):
+        for i in range(4):
+            x = self.downsample[i](x)
+            for conv in self.conv[i]:
+                x = conv(x)
+                
+        x = self.digup(x)
+        logits = self.fc(x)
+        return logits
+    
+
+class PatchConvMixerV1(nn.Module):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__()
+        self.cfg = cfg
+        self.hidden_dim = cfg.hidden_dim
+        # self.depth = [2, 2, 6, 2]
+        self.depth = [1, 2, 3, 1]
+        # self.depth = [3, 3, 9, 3]
+        self.downsample = nn.ModuleList()
+
+        self.patch_embed = PatchEmbed(in_channels=3, hidden_dim=self.hidden_dim,
+                                       patch_size=4)
+        self.downsample.append(self.patch_embed)
+        for i in range(3):
+            self.downsample.append(
+                PatchMerging(hidden_dim=self.hidden_dim))
+            
+        self.conv = nn.ModuleList()
+        for i in range(4):
+            conv = nn.ModuleList([])
+            for _ in range(self.depth[i]):
+                conv.append(
+                    block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
+                )
+            self.conv.append(conv)
+
+        self.attn = Attention(query_dim=self.hidden_dim,
+                              context_dim=self.hidden_dim,
+                              heads=1,
+                              dim_head=self.hidden_dim,)
+        self.digup = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+            nn.LayerNorm(self.hidden_dim),
+        )
+        self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
+        self.norm = nn.LayerNorm(self.hidden_dim)
+        self.latent = nn.Parameter(torch.randn(1, self.hidden_dim))
+
+    def forward(self, x):
+        B, _, _, _ = x.shape
+        latent = repeat(self.latent, 'n d -> b n d', b=B)
+
+        for i in range(4):
+            x = self.downsample[i](x)
+            for conv in self.conv[i]:
+                x = conv(x)
+                
+                context = x.permute(0, 2, 3, 1)
+                context = rearrange(context, 'b ... d -> b (...) d')
+                latent = self.attn(latent, context) + latent
+                latent = self.norm(latent)
+
+        latent = reduce(latent, 'b n d -> b d', 'mean')
+        logits = self.fc(latent)
+        return logits

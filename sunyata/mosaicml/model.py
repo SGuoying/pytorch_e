@@ -7,8 +7,8 @@ from torchmetrics import MetricCollection
 from torchmetrics.classification import MulticlassAccuracy
 from sunyata.pytorch.arch.Vit_pytorch import ConvMixerCfg
 
-from sunyata.pytorch.arch.convmixer import  BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, convformer, Self_ConvMixer2, Self_ConvMixer
-# from sunyata.pytorch.arch.conv_former import ConvMixerV0, ConvMixerV1, ConvMixerV2, ConvMixerV2_1, ConvMixerV3, ConvMixerV3_1, ConvMixerV4, ConvMixerV3_2, ConvMixerV2_2
+from sunyata.pytorch.arch.convmixer import  BayesConvMixer4, BayesConvMixer5, ConvMixer2, ConvMixer, convformer
+from sunyata.pytorch.arch.conv_former import ConvMixerV0, ConvMixerV2, ConvMixerV2_1, ConvMixerV4, ConvMixerV2_2, PatchConvMixerV0, PatchConvMixerV1
 from sunyata.pytorch.arch.convnext import ConvNeXtV2, ConvNeXtV1
 
 # %%
@@ -47,10 +47,6 @@ def build_composer_convmixer(model_name: str = 'convmixer',
         model = BayesConvMixer4(cfg)
     elif model_name == "bayes_convmixer5":
         model = BayesConvMixer5(cfg)
-    elif model_name == "Self_ConvMixer":
-        model = Self_ConvMixer(cfg)
-    elif model_name == "Self_ConvMixer2":
-        model = Self_ConvMixer2(cfg)
 
     elif model_name == "convformer":
         model = convformer(cfg)
@@ -74,10 +70,10 @@ def build_composer_convmixer(model_name: str = 'convmixer',
     # elif model_name == "ConvMixerV3_2":
     #     model = ConvMixerV3_2(cfg)
 
-    elif model_name == "ConvNeXtV2":
-        model = ConvNeXtV2(cfg)
-    elif model_name == "ConvNeXtV1":
-        model = ConvNeXtV1(cfg)
+    elif model_name == "PatchConvMixerV0":
+        model = PatchConvMixerV0(cfg)
+    elif model_name == "PatchConvMixerV1":
+        model = PatchConvMixerV1(cfg)
 
     else:
         raise ValueError(f"model_name='{model_name}' but only 'convmixer' and 'bayes_convmixer' are supported now.")

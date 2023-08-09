@@ -968,7 +968,7 @@ class PatchMerging(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        assert H % 2 == 0 and W % 2 == 0, f"x size ({H}*{W}) are not even."
+        # assert H % 2 == 0 and W % 2 == 0, f"x size ({H}*{W}) are not even."
 
         x0 = x[:, :, 0::2, 0::2]    # B H/2 W/2 C
         x1 = x[:, :, 1::2, 0::2]    # B H/2 W/2 C

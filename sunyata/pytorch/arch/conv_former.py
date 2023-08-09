@@ -18,8 +18,6 @@ class ConvMixerCfg(BaseCfg):
 
     scale: Optional[float] = None
 
-    depth = [1, 2, 3, 1]
-
     drop_rate: float = 0.
     mlp_rate: int = 4
 
@@ -994,7 +992,7 @@ class PatchConvMixerV0(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.depth = [2, 2, 6, 2]
-        self.depth = cfg.depth
+        self.depth = [1, 2, 3, 1]
         # self.depth = [3, 3, 9, 3]
         self.downsample = nn.ModuleList()
 
@@ -1038,7 +1036,7 @@ class PatchConvMixerV1(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         # self.depth = [2, 2, 6, 2]
-        self.depth = cfg.depth
+        self.depth = [1, 2, 3, 1]
         # self.depth = [3, 3, 9, 3]
         self.downsample = nn.ModuleList()
 

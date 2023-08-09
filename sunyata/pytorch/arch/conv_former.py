@@ -86,11 +86,11 @@ class PatchEmbed(nn.Module):
     
 
 class block(nn.Module):
-    def __init__(self, hidden_dim, drop_rate=0.):
+    def __init__(self, hidden_dim, kernel_size, drop_rate=0.):
         super().__init__()
         self.block = nn.Sequential(
             Residual(nn.Sequential(
-                nn.Conv2d(hidden_dim, hidden_dim, 7, groups=hidden_dim, padding="same"),
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim, padding="same"),
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim),
             )),
@@ -970,11 +970,12 @@ class PatchMerging(nn.Module):
         B, C, H, W = x.shape
         assert H % 2 == 0 and W % 2 == 0, f"x size ({H}*{W}) are not even."
 
-        x0 = x[:, 0::2, 0::2, :]  # B H/2 W/2 C
-        x1 = x[:, 1::2, 0::2, :]  # B H/2 W/2 C
-        x2 = x[:, 0::2, 1::2, :]  # B H/2 W/2 C
-        x3 = x[:, 1::2, 1::2, :]  # B H/2 W/2 C
-        x = torch.cat([x0, x1, x2, x3], -1)
+        x0 = x[:, :, 0::2, 0::2]    # B H/2 W/2 C
+        x1 = x[:, :, 1::2, 0::2]    # B H/2 W/2 C
+        x2 = x[:, :, 0::2, 1::2]    # B H/2 W/2 C
+        x3 = x[:, :, 1::2, 1::2]    # B H/2 W/2 C
+
+        x = torch.cat([x0, x1, x2, x3], 1)
         x = self.norm(x)
 
         x = self.reduction(x)
@@ -1004,7 +1005,7 @@ class PatchConvMixerV0(nn.Module):
             conv = nn.ModuleList([])
             for _ in range(self.depth[i]):
                 conv.append(
-                    block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
+                    block(hidden_dim=self.hidden_dim,kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
                 )
             self.conv.append(conv)
 
@@ -1048,7 +1049,7 @@ class PatchConvMixerV1(nn.Module):
             conv = nn.ModuleList([])
             for _ in range(self.depth[i]):
                 conv.append(
-                    block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate)
+                    block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
                 )
             self.conv.append(conv)
 

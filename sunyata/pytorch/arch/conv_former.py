@@ -1017,16 +1017,16 @@ class PatchConvMixerV1(nn.Module):
             
         self.conv = nn.ModuleList()
         for i in range(4):
-            # conv = nn.ModuleList([])
-            # for _ in range(self.depth[i]):
-            #     conv.append(
-            #         block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
-            #     )
-            # self.conv.append(conv)
-            conv = nn.Sequential(
-                *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
-            )
+            conv = nn.ModuleList([])
+            for _ in range(self.depth[i]):
+                conv.append(
+                    block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
+                )
             self.conv.append(conv)
+            # conv = nn.Sequential(
+            #     *[block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+            # )
+            # self.conv.append(conv)
 
         self.attn = Attention(query_dim=self.hidden_dim,
                               context_dim=self.hidden_dim,

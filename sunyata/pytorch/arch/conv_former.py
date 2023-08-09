@@ -135,7 +135,8 @@ class ConvMixerV0(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         self.patch_size = [4, 2, 2, 2]
-        self.depth = [1, 2, 3, 1]
+        # self.depth = [1, 2, 3, 1]
+        self.depth = [2, 2, 6, 2]
 
         self.downsample = nn.ModuleList()
 
@@ -267,7 +268,8 @@ class ConvMixerV2(nn.Module):
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
         self.patch_size = [4, 2, 2, 2]
-        self.depth = [1, 2, 3, 1]
+        # self.depth = [1, 2, 3, 1]
+        self.depth = [2, 2, 6, 2]
         # self.depth = [3, 3, 9, 3]
 
         self.downsample = nn.ModuleList()
@@ -954,8 +956,8 @@ class PatchConvMixerV0(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
-        # self.depth = [2, 2, 6, 2]
-        self.depth = [1, 2, 3, 1]
+        self.depth = [2, 2, 6, 2]
+        # self.depth = [1, 2, 3, 1]
         # self.depth = [3, 3, 9, 3]
         self.downsample = nn.ModuleList()
 
@@ -968,11 +970,15 @@ class PatchConvMixerV0(nn.Module):
             
         self.conv = nn.ModuleList()
         for i in range(4):
-            conv = nn.ModuleList([])
-            for _ in range(self.depth[i]):
-                conv.append(
-                    block(hidden_dim=self.hidden_dim,kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
-                )
+            # conv = nn.ModuleList([])
+            # for _ in range(self.depth[i]):
+            #     conv.append(
+            #         block(hidden_dim=self.hidden_dim,kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
+            #     )
+            # self.conv.append(conv)
+            conv = nn.Sequential(
+                *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+            )
             self.conv.append(conv)
 
         self.digup = nn.Sequential(
@@ -997,8 +1003,8 @@ class PatchConvMixerV1(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.hidden_dim = cfg.hidden_dim
-        # self.depth = [2, 2, 6, 2]
-        self.depth = [1, 2, 3, 1]
+        self.depth = [2, 2, 6, 2]
+        # self.depth = [1, 2, 3, 1]
         # self.depth = [3, 3, 9, 3]
         self.downsample = nn.ModuleList()
 
@@ -1011,11 +1017,15 @@ class PatchConvMixerV1(nn.Module):
             
         self.conv = nn.ModuleList()
         for i in range(4):
-            conv = nn.ModuleList([])
-            for _ in range(self.depth[i]):
-                conv.append(
-                    block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
-                )
+            # conv = nn.ModuleList([])
+            # for _ in range(self.depth[i]):
+            #     conv.append(
+            #         block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
+            #     )
+            # self.conv.append(conv)
+            conv = nn.Sequential(
+                *[block(hidden_dim=self.hidden_dim, drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+            )
             self.conv.append(conv)
 
         self.attn = Attention(query_dim=self.hidden_dim,

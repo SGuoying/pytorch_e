@@ -292,7 +292,8 @@ class ConvMixerV2(nn.Module):
         self.attn = Attention(query_dim=self.hidden_dim,
                               context_dim=self.hidden_dim,
                               heads=1,
-                              dim_head=self.hidden_dim,)
+                              dim_head=self.hidden_dim,
+                              scale=cfg.scale)
         
         self.fc = nn.Linear(self.hidden_dim, cfg.num_classes)
         self.norm = nn.LayerNorm(self.hidden_dim)

@@ -108,7 +108,7 @@ class block(nn.Module):
 
 
 class block2(nn.Module):
-    def __init__(self, hidden_dim, drop_rate=0.):
+    def __init__(self, hidden_dim, kernel_size, drop_rate=0.):
         super().__init__()
         self.block = nn.Sequential(
             Residual(nn.Sequential(
@@ -116,7 +116,7 @@ class block2(nn.Module):
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim), 
             
-                nn.Conv2d(hidden_dim, hidden_dim, 5, groups=hidden_dim, padding="same"),
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size=kernel_size, groups=hidden_dim, padding="same"),
                 nn.GELU(),
                 nn.BatchNorm2d(hidden_dim),
             )),
@@ -149,7 +149,7 @@ class ConvMixerV0(nn.Module):
         self.conv = nn.ModuleList()
         for i in range(4):
             stage = nn.Sequential(
-                *[block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size ,drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
+                *[block2(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size ,drop_rate=cfg.drop_rate) for _ in range(self.depth[i])]
             )
             self.conv.append(stage)
 
@@ -285,7 +285,7 @@ class ConvMixerV2(nn.Module):
             conv = nn.ModuleList([])
             for _ in range(self.depth[i]):
                 conv.append(
-                    block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
+                    block2(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
                 )
             self.conv.append(conv)
 
@@ -974,7 +974,7 @@ class PatchConvMixerV0(nn.Module):
             conv = nn.ModuleList([])
             for _ in range(self.depth[i]):
                 conv.append(
-                    block(hidden_dim=self.hidden_dim,kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
+                    block2(hidden_dim=self.hidden_dim,kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
                 )
             self.conv.append(conv)
             # conv = nn.Sequential(
@@ -1021,7 +1021,7 @@ class PatchConvMixerV1(nn.Module):
             conv = nn.ModuleList([])
             for _ in range(self.depth[i]):
                 conv.append(
-                    block(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
+                    block2(hidden_dim=self.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.drop_rate)
                 )
             self.conv.append(conv)
             # conv = nn.Sequential(

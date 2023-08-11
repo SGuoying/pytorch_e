@@ -5,7 +5,7 @@ from einops import rearrange, repeat, reduce
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch_optimizer
+
 from sunyata.pytorch.arch.base import BaseCfg, Residual
 from sunyata.pytorch_lightning.base import ClassifierModule, BaseModule
 import pytorch_lightning as pl
@@ -371,8 +371,6 @@ class PlConvMixer(pl.LightningModule):
                 # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
-        elif self.cfg.optimizer_method == "Lamb":
-            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
             raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 
@@ -428,8 +426,6 @@ class PlConvMixer1(pl.LightningModule):
                 # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
-        elif self.cfg.optimizer_method == "Lamb":
-            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
             raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 
@@ -486,8 +482,6 @@ class PlConvMixer2(pl.LightningModule):
                 # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
-        elif self.cfg.optimizer_method == "Lamb":
-            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
             raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 
@@ -544,8 +538,6 @@ class PlPatchConvMixer(pl.LightningModule):
                 # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
-        elif self.cfg.optimizer_method == "Lamb":
-            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
             raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 
@@ -601,8 +593,6 @@ class PlPatchConvMixer1(pl.LightningModule):
                 # [{'params': self.parameters(), 'initial_lr': self.cfg.learning_rate}], 
                 lr=self.cfg.learning_rate, 
                 weight_decay=self.cfg.weight_decay)
-        elif self.cfg.optimizer_method == "Lamb":
-            optimizer = torch_optimizer.Lamb(self.parameters(),lr=self.cfg.learning_rate, weight_decay=self.cfg.weight_decay)
         else:
             raise Exception("Only supportSGD, Adam and AdamW and Lamb optimizer till now.")
 

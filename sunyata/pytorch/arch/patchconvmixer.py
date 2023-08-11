@@ -395,6 +395,8 @@ class PlConvMixer(pl.LightningModule):
 class PlConvMixer1(pl.LightningModule):
     def __init__(self, cfg:ConvMixerCfg):
         super(PlConvMixer1, self).__init__()
+        self.save_hyperparameters("cfg")
+        self.cfg = cfg
         self.model = ConvMixer1(cfg)
     
     def forward(self, x):
@@ -451,6 +453,8 @@ class PlConvMixer1(pl.LightningModule):
 class PlConvMixer2(pl.LightningModule):
     def __init__(self, cfg:ConvMixerCfg):
         super(PlConvMixer2, self).__init__()
+        self.save_hyperparameters("cfg")
+        self.cfg = cfg
         self.model = ConvMixer2(cfg)
     
     def forward(self, x):
@@ -507,6 +511,8 @@ class PlConvMixer2(pl.LightningModule):
 class PlPatchConvMixer(pl.LightningModule):
     def __init__(self, cfg:ConvMixerCfg):
         super(PlPatchConvMixer, self).__init__()
+        self.save_hyperparameters("cfg")
+        self.cfg = cfg
         self.model = PatchConvMixer(cfg)
     
     def forward(self, x):
@@ -562,6 +568,8 @@ class PlPatchConvMixer(pl.LightningModule):
 class PlPatchConvMixer1(pl.LightningModule):
     def __init__(self, cfg:ConvMixerCfg):
         super(PlPatchConvMixer1, self).__init__()
+        self.save_hyperparameters("cfg")
+        self.cfg = cfg
         self.model = PatchConvMixer1(cfg)
     
     def forward(self, x):

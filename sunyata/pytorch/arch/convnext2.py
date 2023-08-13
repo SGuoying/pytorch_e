@@ -226,13 +226,13 @@ class ConvNeXtMerg(nn.Module):
 @dataclass
 class ConvNeXtCfg(BaseCfg):
     num_classes: int = 100
-    arch_type: str = 'atto'  # femto pico nano tiny small base large xlarge huge
+    arch_type: str = 'pico'  # femto pico nano tiny small base large xlarge huge
 
     drop_path_rate: float = 0.  # drop path rate
     layer_scale_init_value: float = 1e-6
     head_init_scale: float = 1.
 
-    scale: float = 1.
+    scale: int = 1
     heads: int = 1
 
     type: str = 'standard'  # standard iter iter_attn
@@ -358,12 +358,13 @@ class IterAttnConvNeXt(nn.Module):
 
         self.digups = nn.ModuleList()
         for dim in self.dims:
+            scale = dim ** -0.5 / cfg.scale
             digup = Attention(
                 query_dim=self.dims[-1],
                 context_dim=dim,
                 heads=1,
                 dim_head=self.dims[-1],
-                scale= cfg.scale,
+                scale= scale,
             )
             self.digups.append(digup)
 
@@ -404,12 +405,13 @@ class IterAttnConvNeXtMerg(nn.Module):
 
         self.digups = nn.ModuleList()
         for dim in self.dims:
+            scale = dim ** -0.5 / cfg.scale
             digup = Attention(
                 query_dim=self.dims[-1],
                 context_dim=dim,
                 heads=1,
                 dim_head=self.dims[-1],
-                scale= cfg.scale,
+                scale= scale,
             )
             self.digups.append(digup)
 

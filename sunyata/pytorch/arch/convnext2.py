@@ -358,7 +358,8 @@ class IterAttnConvNeXt(nn.Module):
 
         self.digups = nn.ModuleList()
         for dim in self.dims:
-            scale = dim ** -0.5 / cfg.scale
+            multiple = dim // self.dims[0]
+            scale = dim ** -0.5 / (8 * multiple)
             digup = Attention(
                 query_dim=self.dims[-1],
                 context_dim=dim,
@@ -405,7 +406,8 @@ class IterAttnConvNeXtMerg(nn.Module):
 
         self.digups = nn.ModuleList()
         for dim in self.dims:
-            scale = dim ** -0.5 / cfg.scale
+            multiple = dim // self.dims[0]
+            scale = dim ** -0.5 / (8 * multiple)
             digup = Attention(
                 query_dim=self.dims[-1],
                 context_dim=dim,

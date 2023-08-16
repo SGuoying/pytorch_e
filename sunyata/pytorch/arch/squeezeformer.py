@@ -65,16 +65,36 @@ class GroupNorm(nn.GroupNorm):
         super().__init__(1, num_channels, **kwargs)
 
 
+# class Squeezeing(nn.Module):
+#     def __init__(self, ):
+#         super().__init__()
+#         self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
+#         self.sigmoid = nn.Sigmoid()
+
+#     def forward(self, x):
+#         assert x.ndim == 4
+#         #  (batch_size, channels, 1, 1)
+#         y = self.squeeze(x)
+#         y = self.sigmoid(y)
+#         return x * y.expand_as(x)
 class Squeezeing(nn.Module):
-    def __init__(self, ):
+    def __init__(self, kernel_size=3):
         super().__init__()
         self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
+        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
+                              padding=(kernel_size-1)//2, bias=False)
         self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
+    
+    def forward(self, x: torch.Tensor):
         assert x.ndim == 4
         #  (batch_size, channels, 1, 1)
-        y = self.squeeze(x)
+        y = self.avg_pool(x)
+        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
+        # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
+        y = self.conv(y.squeeze(-1).transpose(-1, -2))
+        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
+        # unsqueeze：(batch_size, channels, 1)变为(batch_size, channels, 1, 1)
+        y = y.transpose(-1, -2).unsqueeze(-1)
         y = self.sigmoid(y)
         return x * y.expand_as(x)
     
@@ -125,6 +145,7 @@ class SqueezeFormerBlock(nn.Module):
         refer to https://arxiv.org/abs/2103.17239
     """
     def __init__(self, dim, mlp_ratio=4., 
+                 kernel_size=3,
                  act_layer=nn.GELU, norm_layer=GroupNorm, 
                  drop=0., drop_path=0., 
                  use_layer_scale=True, layer_scale_init_value=1e-5):
@@ -132,7 +153,7 @@ class SqueezeFormerBlock(nn.Module):
         super().__init__()
 
         self.norm1 = norm_layer(dim)
-        self.token_mixer = Squeezeing()
+        self.token_mixer = Squeezeing(kernel_size=kernel_size)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, 
@@ -163,7 +184,7 @@ class SqueezeFormerBlock(nn.Module):
     
 
 def squeeze_basic_blocks(dim, index, layers, 
-                 mlp_ratio=4., 
+                 mlp_ratio=4., kernel_size=3,
                  act_layer=nn.GELU, norm_layer=GroupNorm, 
                  drop_rate=.0, drop_path_rate=0., 
                  use_layer_scale=True, layer_scale_init_value=1e-5):
@@ -176,7 +197,7 @@ def squeeze_basic_blocks(dim, index, layers,
         block_dpr = drop_path_rate * (
             block_idx + sum(layers[:index])) / (sum(layers) - 1)
         blocks.append(SqueezeFormerBlock(
-            dim, mlp_ratio=mlp_ratio, 
+            dim, mlp_ratio=mlp_ratio, kernel_size=kernel_size,
             act_layer=act_layer, norm_layer=norm_layer, 
             drop=drop_rate, drop_path=block_dpr, 
             use_layer_scale=use_layer_scale, 
@@ -204,7 +225,7 @@ class SqueezeFormer(nn.Module):
     --init_cfg, --pretrained: 
         for mmdetection and mmsegmentation to load pretrained weights
     """
-    def __init__(self, layers, embed_dims=None, 
+    def __init__(self, layers, kernel_size, embed_dims=None, 
                  mlp_ratios=None, downsamples=None, 
                  norm_layer=GroupNorm, act_layer=nn.GELU, 
                  num_classes=1000,
@@ -225,6 +246,7 @@ class SqueezeFormer(nn.Module):
         network = []
         for i in range(len(layers)):
             stage = squeeze_basic_blocks(embed_dims[i], i, layers, 
+                                 kernel_size=kernel_size,
                                  mlp_ratio=mlp_ratios[i],
                                  act_layer=act_layer, norm_layer=norm_layer, 
                                  drop_rate=drop_rate, 
@@ -320,6 +342,7 @@ def squeezeformer(cfg:PoolformerCfg):
     mlp_ratios = arch_settings[cfg.arch_type]['mlp_ratios']
     downsamples = arch_settings[cfg.arch_type]['downsamples']
     model = SqueezeFormer(layers=layers, embed_dims=embed_dims,
+                          kernel_size=cfg.kernel_size,
                        mlp_ratios=mlp_ratios, downsamples=downsamples,
                        num_classes=cfg.num_classes,drop_rate=cfg.drop_rate,
                        drop_path_rate=cfg.drop_path_rate,)

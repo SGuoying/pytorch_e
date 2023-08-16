@@ -299,6 +299,8 @@ class PoolformerCfg(BaseCfg):
     num_classes: int = 100
     arch_type: str = 'small'  # femto pico nano tiny small base large xlarge huge
 
+    kernel_size: int = 3
+
     drop_path_rate: float = 0.  # drop path rate
     layer_scale_init_value: float = 1e-6
 

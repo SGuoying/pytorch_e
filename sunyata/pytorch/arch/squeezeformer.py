@@ -97,6 +97,7 @@ class EfficientChannelAttention(nn.Module):
         assert x.ndim == 4
         y = self.avg_pool(x)
         y = self.conv(y.squeeze(-1).transpose(-1,-2))
+        y = y.transpose(-1, -2).unsqueeze(-1)
         # y = y.transpose(-1,-2).squeeze(-1)
         return y
     
@@ -231,7 +232,7 @@ class SqueezeFormer(nn.Module):
     """
     def __init__(self, layers, kernel_size, embed_dims=None, 
                  mlp_ratios=None, downsamples=None, 
-                 norm_layer=nn.LayerNorm, act_layer=nn.GELU, 
+                 norm_layer=GroupNorm, act_layer=nn.GELU, 
                  num_classes=1000,
                  in_patch_size=7, in_stride=4, in_pad=2, 
                  down_patch_size=3, down_stride=2, down_pad=1, 
@@ -349,7 +350,7 @@ def squeezeformer(cfg:PoolformerCfg):
                           kernel_size=cfg.kernel_size,
                        mlp_ratios=mlp_ratios, downsamples=downsamples,
                        num_classes=cfg.num_classes,drop_rate=cfg.drop_rate,
-                       drop_path_rate=cfg.drop_path_rate, use_layer_scale=cfg.use_layer_scale,)
+                       drop_path_rate=cfg.drop_path_rate,)
     model.layers = layers
     model.embed_dims = embed_dims
     model.mlp_ratios = mlp_ratios

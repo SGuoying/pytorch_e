@@ -349,7 +349,7 @@ def squeezeformer(cfg:PoolformerCfg):
                           kernel_size=cfg.kernel_size,
                        mlp_ratios=mlp_ratios, downsamples=downsamples,
                        num_classes=cfg.num_classes,drop_rate=cfg.drop_rate,
-                       drop_path_rate=cfg.drop_path_rate,)
+                       drop_path_rate=cfg.drop_path_rate, use_layer_scale=cfg.use_layer_scale,)
     model.layers = layers
     model.embed_dims = embed_dims
     model.mlp_ratios = mlp_ratios

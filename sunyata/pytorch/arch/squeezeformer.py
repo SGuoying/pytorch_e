@@ -77,26 +77,28 @@ class GroupNorm(nn.GroupNorm):
 #         y = self.squeeze(x)
 #         y = self.sigmoid(y)
 #         return x * y.expand_as(x)
-class Squeezeing(nn.Module):
-    def __init__(self, kernel_size=3):
-        super().__init__()
-        self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
-        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size,
-                              padding=(kernel_size-1)//2, bias=False)
-        self.sigmoid = nn.Sigmoid()
-    
+class EfficientChannelAttention(nn.Module):
+    """
+    Efficient Channel Attention (ECA) layer.
+    (B, C, H, W) -- nn.AdaptiveAvgPool2d(1) --> (B, C, 1, 1) -- squeeze(-1) -->
+    (B, C, 1) -- transpose(-1,-2) --> (B, 1, C) -- nn.Conv1d(1, 1) -->
+    (B, 1, C) -- transpose(-1,-2) --> (B, C, 1) -- squeeze(-1) --> (B, C)
+
+    References
+    ----------
+    ECA-Net: Efficient Channel Attention for Deep Convolutional Neural Networks. https://github.com/BangguWu/ECANet
+    """
+    def __init__(self, kernel_size: int = 3):
+        super(EfficientChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=kernel_size, padding=(kernel_size-1)//2, bias=False)
+
     def forward(self, x: torch.Tensor):
         assert x.ndim == 4
-        #  (batch_size, channels, 1, 1)
-        y = self.squeeze(x)
-        # squeeze： (batch_size, channels, 1, 1)变为(batch_size, channels, 1)，
-        # transpose：从(batch_size, channels, 1)变为(batch_size, 1, channels)
-        y = self.conv(y.squeeze(-1).transpose(-1, -2))
-        # transpose： (batch_size, 1, channels)变为(batch_size, channels, 1)，
-        # unsqueeze：(batch_size, channels, 1)变为(batch_size, channels, 1, 1)
-        y = y.transpose(-1, -2).unsqueeze(-1)
-        y = self.sigmoid(y)
-        return x * y.expand_as(x)
+        y = self.avg_pool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1,-2))
+        y = y.transpose(-1,-2).squeeze(-1)
+        return y
     
 
 class Mlp(nn.Module):
@@ -109,9 +111,11 @@ class Mlp(nn.Module):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
-        self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
+        # self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
+        self.fc1 = nn.Linear(in_features, hidden_features)
         self.act = act_layer()
-        self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
+        # self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
+        self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
         self.apply(self._init_weights)
 
@@ -153,7 +157,7 @@ class SqueezeFormerBlock(nn.Module):
         super().__init__()
 
         self.norm1 = norm_layer(dim)
-        self.token_mixer = Squeezeing(kernel_size=kernel_size)
+        self.token_mixer = EfficientChannelAttention(kernel_size=kernel_size)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, 
@@ -359,4 +363,8 @@ class PlSqueezeFormer(ClassifierModule):
 
     def forward(self, x):
         return self.model(x)
+    
+
+
+
 

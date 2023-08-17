@@ -231,7 +231,7 @@ class SqueezeFormer(nn.Module):
     """
     def __init__(self, layers, kernel_size, embed_dims=None, 
                  mlp_ratios=None, downsamples=None, 
-                 norm_layer=GroupNorm, act_layer=nn.GELU, 
+                 norm_layer=nn.LayerNorm, act_layer=nn.GELU, 
                  num_classes=1000,
                  in_patch_size=7, in_stride=4, in_pad=2, 
                  down_patch_size=3, down_stride=2, down_pad=1, 

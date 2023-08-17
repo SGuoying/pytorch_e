@@ -26,7 +26,7 @@ class EfficientChannelAttention(nn.Module):
         assert x.ndim == 4
         y = self.avg_pool(x)
         y = self.conv(y.squeeze(-1).transpose(-1,-2))
-        # y = y.transpose(-1,-2).squeeze(-1)
+        y = y.transpose(-1,-2).squeeze(-1)
         return y
 
 

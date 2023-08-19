@@ -30,11 +30,13 @@ class ViTCfg(BaseCfg):
     image_size: int = 224
     patch_size: int = 16
     num_classes: int = 100
+    kernel_size: int = 5
 
     posemb: str = 'sincos2d'  # or 'learn'
     pool: str = 'mean' # or 'cls'
 
     emb_dropout: float = 0. 
+    conv_drop_rate: float = 0.
 
     scale: float = 1.
 

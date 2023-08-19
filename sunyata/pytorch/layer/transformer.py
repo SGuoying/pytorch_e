@@ -1,53 +1,44 @@
 from dataclasses import dataclass
+from typing import Optional
 import torch
 import torch.nn as nn
-from sunyata.pytorch.layer.attention import Attention
+from sunyata.pytorch.layer.attention import SelfAttention, Attention
 
 
 @dataclass
 class TransformerCfg:
-    hidden_dim: int = None
+    hidden_dim: int = 128
 
      # attention
-    is_attn: bool = True
-    num_heads: int = None  # 16
-    attn_scale: float = None
+    num_heads: int = 8
+    attn_scale: Optional[float] = None
     attn_dropout: float = 0.
-    is_mask: bool = True
-    is_softmax: bool = True
-    fore_mask: bool = True
 
     # feed forward
-    is_ff: bool = True
-    expanded_dim: int = None  # 2048
+    expansion: int = 4
     ff_dropout: float = 0.
     ff_act_nn: nn.Module = nn.GELU()
-
-    # layernorm
-    is_attn_layernorm: bool = True
-    is_ff_layernorm: bool = True
-
-    # shortcut
-    # is_attn_shortcut: bool = True
-    # is_ff_shortcut: bool = True
 
 
 class TransformerLayer(nn.Module):
     def __init__(self, cfg:TransformerCfg):
         super().__init__()
-        self.attention = Attention(cfg.hidden_dim, cfg.num_heads, cfg.attn_scale, cfg.attn_dropout,
-                                    cfg.is_mask, cfg.is_softmax, cfg.fore_mask) if cfg.is_attn else nn.Identity()
+        assert cfg.hidden_dim % cfg.num_heads == 0
+        dim_head = cfg.hidden_dim // cfg.num_heads
+        self.attention = Attention(query_dim=cfg.hidden_dim, context_dim=cfg.hidden_dim, heads=cfg.num_heads,
+                                    dim_head=dim_head, dropout=cfg.attn_dropout, scale = cfg.attn_scale)
 
-        self.feed_forward = FeedForward(cfg.hidden_dim, cfg.expanded_dim, cfg.ff_act_nn, 
-                                        cfg.ff_dropout) if cfg.is_ff else nn.Identity()
+        expanded_dim = cfg.expansion * cfg.hidden_dim
+        self.feed_forward = FeedForward(cfg.hidden_dim, expanded_dim, cfg.ff_act_nn, 
+                                        cfg.ff_dropout)
         
 
-        self.attn_layernorm = nn.LayerNorm(cfg.hidden_dim) if cfg.is_attn_layernorm else nn.Identity()
-        self.ff_layernorm = nn.LayerNorm(cfg.hidden_dim) if cfg.is_ff_layernorm else nn.Identity()
+        self.attn_layernorm = nn.LayerNorm(cfg.hidden_dim)
+        self.ff_layernorm = nn.LayerNorm(cfg.hidden_dim)
 
     def forward(self, x):
-        x = self.attn_layernorm(x + self.attention(x))
-        x = self.ff_layernorm(x + self.feed_forward(x))
+        x = x + self.attn_layernorm(self.attention(x))
+        x = x + self.ff_layernorm(self.feed_forward(x))
         return x
         
 
@@ -81,8 +72,8 @@ class TransformerLayerPostNorm(TransformerLayer):
         super().__init__(cfg)
 
     def forward(self, x):
-        x = x + self.attn_layernorm(self.attention(x))
-        x = x + self.ff_layernorm(self.feed_forward(x))
+        x = self.attn_layernorm(x + self.attention(x))
+        x = self.ff_layernorm(x + self.feed_forward(x))
         return x
 
 
@@ -97,7 +88,7 @@ class TransformerLayerNoShortcut(TransformerLayer):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, hidden_dim, expanded_dim, act_nn=nn.GELU(), dropout=0.):
+    def __init__(self, hidden_dim, expanded_dim, act_nn:nn.Module=nn.GELU(), dropout=0.):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(hidden_dim, expanded_dim),

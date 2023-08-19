@@ -69,24 +69,6 @@ class Attention(nn.Module):
     """
     Cross Attention modified from Perceiver.
 
-    Three dimensions:
-    - query_dim (or latent_dim): dim of the latent space
-    - context_dim: dim of the input space
-    - inner_dim: dim of the inner space of attention, equal to dim_head * heads
-
-    Two inputs:
-    - x: input from the latent space, with shape (latent, query_dim)
-    - context: input from the input space, with shape (input, context_dim)
-
-    Data flow:
-    x(latent, query_dim) -- Linear(query_dim, inner_dim) --> q(latent, inner_dim)
-    context(input, context_dim) -- nn.Linear(context_dim, inner_dim * 2) --> k,v(input, inner_dim)
-    q(latent, inner_dim) * k(input, inner_dim) --> sim(latent, input) -- softmax(dim=-1) -->
-    attn(latent, input) * v(input, inner_dim) --> 
-    out(latent, inner_dim) -- Linear(inner_dim, query_dim) --> out(latent, query_dim)
-
-    Refs:
-    https://github.com/lucidrains/perceiver-pytorch/
     """
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, scale=None, dropout=0.):
 
@@ -269,29 +251,6 @@ class ConvVit(ClassifierModule):
 
         return logits
         
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

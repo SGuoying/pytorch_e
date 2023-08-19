@@ -1,5 +1,4 @@
 from typing import Optional
-from timm.models.vision_transformer import VisionTransformer
 from dataclasses import dataclass
 import torch
 import torch.nn as nn
@@ -10,16 +9,6 @@ from sunyata.pytorch.arch.base import BaseCfg, Residual
 from sunyata.pytorch.layer.attention import Attention
 from sunyata.pytorch_lightning.base import ClassifierModule
 from torchvision.ops import StochasticDepth
-
-
-from sunyata.pytorch.arch.bayes.core import log_bayesian_iteration
-from sunyata.pytorch.layer.transformer import (
-    # TransformerCfg,
-    TransformerLayer, 
-    TransformerLayerPreNorm,
-    TransformerLayerPostNorm,
-    )
-
 
 
 @dataclass
@@ -60,6 +49,21 @@ class ViTCfg(BaseCfg):
     scale: float = 1.
 
     type: str = 'standard'
+    
+
+class ConvMixerLayer(nn.Sequential):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
+        super().__init__(
+            Residual(nn.Sequential(
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
+                nn.GELU(),
+                nn.BatchNorm2d(hidden_dim),
+            )),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim), 
+            StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
+        )
 
 
 class Attention(nn.Module):
@@ -103,6 +107,7 @@ class Attention(nn.Module):
         self.to_out = nn.Linear(inner_dim, query_dim) if project_out else nn.Identity()
 
     def forward(self, x, context = None):
+
         h = self.heads
 
         q = self.to_q(x)
@@ -140,6 +145,7 @@ class FeedForward(nn.Module):
 class TransformerLayer(nn.Module):
     def __init__(self, cfg:TransformerCfg):
         super().__init__()
+        
         dim_head = cfg.hidden_dim // cfg.num_heads
         self.attn = Attention(query_dim=cfg.hidden_dim, 
                               context_dim=cfg.hidden_dim, 
@@ -159,25 +165,10 @@ class TransformerLayer(nn.Module):
         self.norm1 = nn.LayerNorm(cfg.hidden_dim)
         self.norm2 = nn.LayerNorm(cfg.hidden_dim)
 
-    def forward(self, x, context = None):
-        x = x + self.attn(self.norm1(x), context)
-        x = x + self.ff(self.norm2(x))
-        return x
-    
-
-class ConvMixerLayer(nn.Sequential):
-    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
-        super().__init__(
-            Residual(nn.Sequential(
-                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
-                nn.GELU(),
-                nn.BatchNorm2d(hidden_dim),
-            )),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
-            nn.GELU(),
-            nn.BatchNorm2d(hidden_dim), 
-            StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
-        )
+    def forward(self, latent, context = None):
+        latent = latent + self.attn(self.norm1(latent), context)
+        latent = latent + self.ff(self.norm2(latent))
+        return latent
 
 
 class ConvVit(ClassifierModule):
@@ -227,21 +218,26 @@ class ConvVit(ClassifierModule):
             self.cls_token = nn.Parameter(torch.randn(1, 1, cfg.hidden_dim))
 
         #  conv block and trans block
-        # self.trans_layers = nn.Sequential(*[
-        #     TransformerLayer(cfg.transformer) for _ in range(cfg.num_layers)
-        # ])
+        # self.layers = nn.Sequential(
+        #     *[TransformerLayer(cfg.transformer) for _ in range(cfg.num_layers)],
+        # )
 
         # self.conv_layers = nn.Sequential(*[
         #     ConvMixerLayer(hidden_dim=cfg.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.conv_drop_rate) for _ in range(cfg.num_layers)
         # ])
         self.num_layers = cfg.num_layers
-        self.block = nn.ModuleList()
+        self.conv = nn.ModuleList()
+        self.trans = nn.ModuleList()
         for _ in range(self.num_layers):
-            block = nn.Sequential(
-                *[TransformerLayer(cfg.transformer),
-                ConvMixerLayer(hidden_dim=cfg.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.conv_drop_rate)]
+            conv = nn.Sequential(
+                ConvMixerLayer(hidden_dim=cfg.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.conv_drop_rate)
             )
-            self.block.append(block)
+            self.conv.append(conv)
+            trans = nn.Sequential(
+                TransformerLayer(cfg.transformer) 
+            )
+            self.trans.append(trans)
+
 
         # classification head
         self.emb_dropout = nn.Dropout(cfg.emb_dropout)
@@ -253,24 +249,25 @@ class ConvVit(ClassifierModule):
 
         self.cfg = cfg
         
-        self.latent = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
+        # self.latent = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
 
     def forward(self, x):
         B, _, _, _ = x.shape
-        latent = repeat(self.latent, '1 1 d -> b 1 d', b = B)
-
-        latent += self.pos_embedding
+        x_trans = x.clone()
+        # latent = repeat(self.latent, '1 1 d -> b 1 d', b = B)
 
         x = self.conv_patch(x)
+        latent = self.to_patch_embedding(x_trans)
+        latent += self.pos_embedding
+
         if self.pool == 'cls':
             cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b = B)
             x = torch.cat((cls_tokens, latent), dim=1)
-
+        
         for i in range(self.num_layers):
-            for conv, trans in self.block[i]:
-                x = conv(x)
-                context = rearrange(x, 'b c h w -> b (h w) c')
-                latent = trans(latent, context)
+            x = self.conv[i](x)
+            context = rearrange(x, 'b c h w -> b (h w) c')
+            latent = self.trans[i](latent, context)
 
         latent = self.final_ln(latent)
         x_chosen = latent.mean(dim = 1) if self.pool == 'mean' else latent[:, 0]

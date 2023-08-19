@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from einops import repeat, rearrange
 from einops.layers.torch import Rearrange
 from sunyata.pytorch.arch.base import BaseCfg, Residual
-from sunyata.pytorch.layer.attention import Attention
 from sunyata.pytorch_lightning.base import ClassifierModule
 from torchvision.ops import StochasticDepth
 
@@ -229,15 +228,10 @@ class ConvVit(ClassifierModule):
         self.conv = nn.ModuleList()
         self.trans = nn.ModuleList()
         for _ in range(self.num_layers):
-            conv = nn.Sequential(
-                ConvMixerLayer(hidden_dim=cfg.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.conv_drop_rate)
-            )
+            conv = ConvMixerLayer(hidden_dim=cfg.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.conv_drop_rate)
             self.conv.append(conv)
-            trans = nn.Sequential(
-                TransformerLayer(cfg.transformer) 
-            )
+            trans = TransformerLayer(cfg.transformer) 
             self.trans.append(trans)
-
 
         # classification head
         self.emb_dropout = nn.Dropout(cfg.emb_dropout)

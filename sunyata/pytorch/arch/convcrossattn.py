@@ -157,7 +157,7 @@ class ConvVit(ClassifierModule):
         super().__init__(cfg)
         self.save_hyperparameters("cfg")
 
-        # patch embedding  block
+        #  patch embedding  block
         self.conv_patch = nn.Sequential(
             nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size, stride=cfg.patch_size),
             nn.GELU(),
@@ -198,14 +198,6 @@ class ConvVit(ClassifierModule):
         if self.pool == 'cls':
             self.cls_token = nn.Parameter(torch.randn(1, 1, cfg.hidden_dim))
 
-        #  conv block and trans block
-        # self.layers = nn.Sequential(
-        #     *[TransformerLayer(cfg.transformer) for _ in range(cfg.num_layers)],
-        # )
-
-        # self.conv_layers = nn.Sequential(*[
-        #     ConvMixerLayer(hidden_dim=cfg.hidden_dim, kernel_size=cfg.kernel_size, drop_rate=cfg.conv_drop_rate) for _ in range(cfg.num_layers)
-        # ])
         self.num_layers = cfg.num_layers
         self.conv = nn.ModuleList()
         self.trans = nn.ModuleList()

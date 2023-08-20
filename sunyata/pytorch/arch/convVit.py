@@ -38,17 +38,39 @@ class ViTCfg(BaseCfg):
     image_size: int = 224
     patch_size: int = 16
     num_classes: int = 100
-    kernel_size: int = 5
+    kernel_size: int = 3
+    num_heads: int = 8
 
     posemb: str = 'sincos2d'  # or 'learn'
     pool: str = 'mean' # or 'cls'
 
     emb_dropout: float = 0. 
     conv_drop_rate: float = 0.
+    attn_dropout: float = 0.
 
     scale: float = 1.
+    attn_scale: Optional[float] = None
+    # feed forward
+    expansion: int = 4
+    ff_dropout: float = 0.
+    ff_act_nn: nn.Module = nn.GELU()
 
     type: str = 'standard'
+
+
+class ConvMixerLayer(nn.Sequential):
+    def __init__(self, hidden_dim: int, kernel_size: int, drop_rate: float=0.):
+        super().__init__(
+            Residual(nn.Sequential(
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, groups=hidden_dim, padding="same"),
+                nn.GELU(),
+                nn.BatchNorm2d(hidden_dim),
+            )),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),
+            nn.GELU(),
+            nn.BatchNorm2d(hidden_dim), 
+            StochasticDepth(drop_rate, 'row') if drop_rate > 0. else nn.Identity(),
+        )
 
 
 class Attention(nn.Module):
@@ -56,15 +78,7 @@ class Attention(nn.Module):
     Cross Attention modified from Perceiver.
 
     """
-    def __init__(self, query_dim, 
-                 kernel_size, 
-                 context_dim=None, 
-                 heads=8, 
-                 dim_head=64, 
-                 scale=None, 
-                 use_conv=True, 
-                 with_cls_token=True, 
-                 dropout=0.):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, scale=None, dropout=0.):
 
         super().__init__()
         inner_dim = dim_head * heads
@@ -72,71 +86,22 @@ class Attention(nn.Module):
 
         context_dim = context_dim if context_dim is not None else query_dim
 
-        self.scale = dim_head ** -0.5 if scale is None else scale 
+        self.scale = dim_head ** -0.5 if scale is None else scale # / 10.
         self.heads = heads
-        self.with_cls_token = with_cls_token
-
-        self.conv_vk = self.conv_block(hidden_dim=context_dim,out_dim=context_dim*2, kernel_size=kernel_size, use_conv=use_conv)
-        # self.conv_v = self.conv_block(hidden_dim=context_dim, kernel_size=kernel_size, use_conv=use_conv)
-        self.reduce_b = self.reduce_block(hidden_dim=context_dim)
 
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
-        # self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias=False)
-        self.to_k = nn.Linear(query_dim, inner_dim, bias=False)
-        self.to_v = nn.Linear(query_dim, inner_dim, bias=False)
+        self.to_kv = nn.Linear(context_dim, inner_dim * 2, bias=False)
 
         self.dropout = nn.Dropout(dropout)
         self.to_out = nn.Linear(inner_dim, query_dim) if project_out else nn.Identity()
 
-    def conv_block(self, hidden_dim, out_dim, kernel_size, use_conv=True):
-        if use_conv:
-            conv = nn.Sequential(
-                nn.Conv2d(hidden_dim, out_dim, kernel_size, groups=hidden_dim, padding='same'),
-                nn.BatchNorm2d(out_dim),
-                # Rearrange('b c h w -> b (h w) c'),
-            )
-        else:
-            conv = None
-
-        return conv
-    
-    def reduce_block(self, hidden_dim):
-        reduce = nn.Sequential(
-            nn.Conv2d(hidden_dim*2, hidden_dim, 1),
-            nn.BatchNorm2d(hidden_dim)
-        )
-        return reduce
-    
-    def forward_conv(self, x):
-        res = x
-        if self.conv_vk is not None:
-            x = self.conv_vk(x)
-            k, v = x.chunk(2, dim=1)
-            k = rearrange(k, 'b c h w -> b (h w) c')
-            v = rearrange(x, 'b c h w -> b (h w) c')
-            x = self.reduce_b(x) + res
-        else:
-            k = rearrange(x, 'b c h w -> b (h w) c')
-            v = rearrange(x, 'b c h w -> b (h w) c')
-        # if self.conv_v is not None:
-        #     v = self.conv_v(x)
-        #     v = rearrange(x, 'b c h w -> b (h w) c')
-            
-        # else:
-
-        return x, k, v
-
-    def forward(self, latent, context = None):
-        if self.conv_vk is not None:
-            x, k, v = self.forward_conv(context)
+    def forward(self, x, context = None):
 
         h = self.heads
 
-        q = self.to_q(latent)
-        context = context if context is not None else latent
-        # k, v = self.to_kv(context).chunk(2, dim=-1)
-        k = self.to_k(k)
-        v = self.to_v(v)
+        q = self.to_q(x)
+        context = context if context is not None else x
+        k, v = self.to_kv(context).chunk(2, dim=-1)
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q,k,v))
 
@@ -148,7 +113,7 @@ class Attention(nn.Module):
         out = torch.einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
         out = self.to_out(out)
-        return out, x
+        return out
     
 
 class FeedForward(nn.Module):
@@ -172,8 +137,7 @@ class TransformerLayer(nn.Module):
         
         dim_head = cfg.hidden_dim // cfg.num_heads
         self.attn = Attention(query_dim=cfg.hidden_dim, 
-                              context_dim=cfg.hidden_dim,
-                              kernel_size=cfg.kernel_size, 
+                              context_dim=cfg.hidden_dim, 
                               heads=cfg.num_heads,
                               dim_head=dim_head, 
                               scale=cfg.attn_scale, 
@@ -190,50 +154,22 @@ class TransformerLayer(nn.Module):
         self.norm1 = nn.LayerNorm(cfg.hidden_dim)
         self.norm2 = nn.LayerNorm(cfg.hidden_dim)
 
-    def forward(self, latent, context = None):
-        res = latent
-        latent = self.norm1(latent)
-        latent, x = self.attn(latent, context)
-        latent = res + latent
-
-        # latent = latent + self.attn(self.norm1(latent), context)
+    def forward(self, latent):
+        latent = latent + self.attn(self.norm1(latent))
         latent = latent + self.ff(self.norm2(latent))
-        return latent, x
-    
-
-class patch_embed(nn.Module):
-    def __init__(self, in_dim=3, dim=256, patch_size=7, norm_layer=nn.BatchNorm2d):
-        super().__init__()
-        self.patch_size = patch_size
-
-        self.norm_layer = norm_layer
-
-        self.conv = nn.Conv2d(in_dim, dim, 
-                              kernel_size=patch_size, 
-                              stride=patch_size)
-        self.norm = norm_layer(dim) if norm_layer == nn.BatchNorm2d else nn.LayerNorm(dim)
-
-    def forward(self, x):
-        x = self.conv(x)
-        B, C, H, W = x.shape
-
-        if self.norm_layer != nn.BatchNorm2d:
-            x = rearrange(x, 'b c h w -> b (h w) c')
-            x = self.norm(x)
-            x = rearrange(x, 'b (h w) c -> b c h w', h=H, w=W)
-        else:
-            x = self.norm(x)
-
-        return x
-    
-def pair(t):
-    return t if isinstance(t, tuple) else (t, t)
+        return latent
 
 
-class ConvTransformer(ClassifierModule):
+
+class ViT(ClassifierModule):
     def __init__(self, cfg: ViTCfg):
         super().__init__(cfg)
+
         self.save_hyperparameters("cfg")
+
+        self.layers = nn.Sequential(*[
+            TransformerLayer(cfg.transformer) for _ in range(cfg.num_layers)
+        ])
 
         image_height, image_width = pair(cfg.image_size)
         patch_height, patch_width = pair(cfg.patch_size)
@@ -250,25 +186,24 @@ class ConvTransformer(ClassifierModule):
             nn.LayerNorm(cfg.hidden_dim),
         )
 
-        self.patch_embed = patch_embed(in_dim=3,
-                                       dim=cfg.hidden_dim,
-                                       patch_size=cfg.patch_size,
-                                       )
-        with_cls_token = False
-        if with_cls_token:
-            self.cls_token = nn.Parameter(torch.randn(1, 1, cfg.hidden_dim))
-        else:
-            self.cls_token = None
-        
-        layers = []
-        for _ in range(cfg.num_layers):
-             layers.append(
-             TransformerLayer(cfg.transformer)
-             )
+        assert cfg.pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
+        self.pool = cfg.pool
+        assert cfg.posemb in {'learn', 'sincos2d'}, 'posemb type must be either learn or sincos2d'
+        self.posemb = cfg.posemb
 
-        self.layers = nn.ModuleList(layers)
-        
-        # classification head
+        if self.posemb == 'learn':
+            self.pos_embedding = nn.Parameter(torch.randn(1, num_patches, cfg.hidden_dim))
+        elif self.posemb == 'sincos2d':
+            pos_embedding = posemb_sincos_2d(
+            h = image_height // patch_height,
+            w = image_width // patch_width,
+            dim = cfg.hidden_dim,
+            )
+            self.register_buffer('pos_embedding', pos_embedding)
+
+        if self.pool == 'cls':
+            self.cls_token = nn.Parameter(torch.randn(1, 1, cfg.hidden_dim))
+
         self.emb_dropout = nn.Dropout(cfg.emb_dropout)
         self.final_ln = nn.LayerNorm(cfg.hidden_dim)
         self.mlp_head = nn.Sequential(
@@ -277,31 +212,187 @@ class ConvTransformer(ClassifierModule):
         )        
 
         self.cfg = cfg
-        
-        self.latent = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
+
+    def forward(self, img):
+        x = self.to_patch_embedding(img)
+        batch_size, num_patches, _ = x.shape
+
+        x += self.pos_embedding
+
+        if self.pool == 'cls':
+            cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
+            x = torch.cat((cls_tokens, x), dim=1)
+
+        x = self.emb_dropout(x)
+
+        x = self.layers(x)
+
+        x = self.final_ln(x)
+        x_chosen = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
+
+        logits = self.mlp_head(x_chosen)
+
+        return logits
+    
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.fn = fn
+        self.norm = nn.LayerNorm(dim)
+
+    def forward(self, x, **kwargs):
+        x = self.norm(x)
+
+        return self.fn(x, **kwargs)
+
+
+from functools import wraps
+def cache_fn(f):
+    cache = dict()
+    @wraps(f)
+    def cached_fn(*args, _cache = True, key = None, **kwargs):
+        if not _cache:
+            return f(*args, **kwargs)
+        nonlocal cache
+        if key in cache:
+            return cache[key]
+        result = f(*args, **kwargs)
+        cache[key] = result
+        return result
+    return cached_fn
+
+
+class ConVit(ClassifierModule):
+    def __init__(self, cfg: ViTCfg):
+        super().__init__(cfg)
+        self.save_hyperparameters("cfg")
+        self.cfg = cfg
+
+        # patch embedding  block
+        # self.patch_embed = nn.Sequential(
+        #     nn.Conv2d(3, cfg.hidden_dim, kernel_size=cfg.patch_size, stride=cfg.patch_size),
+        #     nn.GELU(),
+        #     nn.BatchNorm2d(cfg.hidden_dim)
+        # )
+
+        image_height, image_width = pair(cfg.image_size)
+        patch_height, patch_width = pair(cfg.patch_size)
+
+        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
+
+        num_patches = (image_height // patch_height) * (image_width // patch_width)
+        patch_dim = 3 * patch_height * patch_width
+
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
+            nn.LayerNorm(patch_dim),
+            nn.Linear(patch_dim, cfg.hidden_dim),
+            nn.LayerNorm(cfg.hidden_dim),
+        )
+
+        assert cfg.pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
+        self.pool = cfg.pool
+        assert cfg.posemb in {'learn', 'sincos2d'}, 'posemb type must be either learn or sincos2d'
+        self.posemb = cfg.posemb
+
+        if self.posemb == 'learn':
+            self.pos_embedding = nn.Parameter(torch.randn(1, num_patches, cfg.hidden_dim))
+        elif self.posemb == 'sincos2d':
+            pos_embedding = posemb_sincos_2d(
+                h=image_height // patch_height,
+                w=image_width // patch_width,
+                dim=cfg.hidden_dim,
+            )
+            self.register_buffer('pos_embedding', pos_embedding)
+
+        if self.pool == 'cls':
+            self.cls_token = nn.Parameter(torch.randn(1, 1, cfg.hidden_dim))
+
+        dim_head = cfg.hidden_dim // cfg.num_heads
+        expanded_dim = cfg.hidden_dim * cfg.expansion
+
+        self.layers = nn.ModuleList([])
+        for _ in range(cfg.num_layers):
+            self.layers.append(nn.ModuleList([
+                Attention(query_dim=cfg.hidden_dim,
+                          context_dim=cfg.hidden_dim,
+                          heads=cfg.num_heads,
+                          dim_head=dim_head,
+                          scale=cfg.scale,
+                          dropout=cfg.attn_dropout),
+                nn.LayerNorm(cfg.hidden_dim),
+                FeedForward(hidden_dim=cfg.hidden_dim,
+                            expanded_dim=expanded_dim,
+                            act_nn=cfg.ff_act_nn,
+                            dropout=cfg.ff_dropout),
+                nn.LayerNorm(cfg.hidden_dim),
+
+                # ConvMixerLayer(hidden_dim=cfg.hidden_dim,
+                #                kernel_size=cfg.kernel_size)
+            ]))
+
+        self.attn = Attention(query_dim=cfg.hidden_dim,
+                              context_dim=cfg.hidden_dim,
+                              heads=cfg.num_heads,
+                              dim_head=dim_head,
+                              scale=cfg.scale)
+
+        self.norm = nn.LayerNorm(cfg.hidden_dim)
+        self.emb_dropout = nn.Dropout(cfg.emb_dropout)
+        self.final_ln = nn.LayerNorm(cfg.hidden_dim)
+        self.mlp_head = nn.Sequential(
+            # nn.LayerNorm(cfg.hidden_dim),
+            nn.Linear(cfg.hidden_dim, cfg.num_classes)
+        )
+
+        self.latent = nn.Parameter(torch.zeros(num_patches, cfg.hidden_dim))
 
     def forward(self, x):
         B, _, _, _ = x.shape
-        latent = repeat(self.latent, '1 1 d -> b 1 d', b = B)
+        latent = repeat(self.latent, 'n d -> b n d', b = B)
 
-        x = self.patch_embed(x)
+        trans = self.to_patch_embedding(x)
+        latent = self.attn(self.norm(latent), trans) + latent
 
-        cls_tokens = None
-        if self.cls_token is not None:
-            # stole cls_tokens impl from Phil Wang, thanks
-            cls_tokens = self.cls_token.expand(B, -1, -1)
-            x = torch.cat((cls_tokens, x), dim=1)
+        trans += self.pos_embedding
 
-        for layer in self.layers:
-            latent, context = layer(latent, x)
-            x = context + x
+        if self.pool == 'cls':
+            cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=B)
+            trans = torch.cat((cls_tokens, trans), dim=1)
+
+        latent = self.emb_dropout(latent)
+
+        for self_attn, attn_norm, self_ff, ff_norm in self.layers:
+            # trans = trans + self_attn(attn_norm(trans))
+            # latent = self.attn(trans, latent) + trans
+            # trans = latent + self_ff(ff_norm(latent))
+
+            latent = latent + self_attn(attn_norm(latent))
+            latent = latent + self.attn(self.norm(latent), trans)
+            latent = latent + self_ff(ff_norm(latent))
 
         latent = self.final_ln(latent)
-        x_chosen = latent.mean(dim = 1)
-        logits = self.mlp_head(x_chosen)
+        logits = latent.mean(dim=1) if self.pool == 'mean' else latent[:, 0]
+        logits = self.mlp_head(logits)
 
         return logits
 
 
+        
 
 
+def pair(t):
+    return t if isinstance(t, tuple) else (t, t)
+
+
+def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype = torch.float32):
+    y, x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing="ij")
+    assert (dim % 4) == 0, "feature dimension must be multiple of 4 for sincos emb"
+    omega = torch.arange(dim // 4) / (dim // 4 - 1)
+    omega = 1.0 / (temperature ** omega)
+
+    y = y.flatten()[:, None] * omega[None, :]
+    x = x.flatten()[:, None] * omega[None, :]
+    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
+    return pe.type(dtype)

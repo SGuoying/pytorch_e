@@ -10,6 +10,8 @@ from sunyata.pytorch.layer.drop import DropPath
 from sunyata.pytorch.layer.attention import Attention
 from sunyata.pytorch_lightning.base import BaseModule, ClassifierModule
 
+from mup import MuReadout
+
 # copy from https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py
 
 class LayerNorm(nn.Module):
@@ -145,84 +147,6 @@ class ConvNeXt(nn.Module):
         return x
 
 
-class PatchMerging(nn.Module):
-    def __init__(self, hidden_dim, out_dim):
-        super().__init__()
-
-        self.hidden_dim = hidden_dim
-        self.reduction = nn.Conv2d(4 * hidden_dim, out_dim, kernel_size=1)
-        self.norm = LayerNorm(hidden_dim * 4, eps=1e-6, data_format="channels_first")
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        assert H % 2 == 0 and W % 2 == 0, f"x size ({H}*{W}) are not even."
-
-        x0 = x[:, :, 0::2, 0::2]    # B H/2 W/2 C
-        x1 = x[:, :, 1::2, 0::2]    # B H/2 W/2 C
-        x2 = x[:, :, 0::2, 1::2]    # B H/2 W/2 C
-        x3 = x[:, :, 1::2, 1::2]    # B H/2 W/2 C
-
-        x = torch.cat([x0, x1, x2, x3], dim=1)
-        x = self.norm(x)
-
-        x = self.reduction(x)
-
-        return x
-    
-class ConvNeXtMerg(nn.Module):
-    def __init__(self, in_chans=3, num_classes=1000, 
-                 depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=0., 
-                 layer_scale_init_value=1e-6, head_init_scale=1.,
-                 ):
-        super().__init__()
-
-        self.downsample_layers = nn.ModuleList() # stem and 3 intermediate downsampling conv layers
-        stem = nn.Sequential(
-            nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4),
-            LayerNorm(dims[0], eps=1e-6, data_format="channels_first")
-        )
-        self.downsample_layers.append(stem)
-        for i in range(3):
-            downsample_layer = nn.Sequential(
-                PatchMerging(hidden_dim=dims[i],
-                            out_dim=dims[i+1])
-            )
-            self.downsample_layers.append(downsample_layer)
-
-        self.stages = nn.ModuleList() # 4 feature resolution stages, each consisting of multiple residual blocks
-        dp_rates=[x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))] 
-        cur = 0
-        for i in range(4):
-            stage = nn.Sequential(
-                *[Block(dim=dims[i], drop_path=dp_rates[cur + j], 
-                layer_scale_init_value=layer_scale_init_value) for j in range(depths[i])]
-            )
-            self.stages.append(stage)
-            cur += depths[i]
-
-        self.norm = nn.LayerNorm(dims[-1], eps=1e-6) # final norm layer
-        self.head = nn.Linear(dims[-1], num_classes)
-
-        self.apply(self._init_weights)
-        self.head.weight.data.mul_(head_init_scale)
-        self.head.bias.data.mul_(head_init_scale)
-
-    def _init_weights(self, m):
-        if isinstance(m, (nn.Conv2d, nn.Linear)):
-            trunc_normal_(m.weight, std=.02)
-            nn.init.constant_(m.bias, 0) # type: ignore
-
-    def forward_features(self, x):
-        for i in range(4):
-            x = self.downsample_layers[i](x)
-            x = self.stages[i](x)
-        return self.norm(x.mean([-2, -1])) # global average pooling, (N, C, H, W) -> (N, C)
-
-    def forward(self, x):
-        x = self.forward_features(x)
-        x = self.head(x)
-        return x
-
 @dataclass
 class ConvNeXtCfg(BaseCfg):
     num_classes: int = 100
@@ -294,61 +218,6 @@ def convnext(cfg:ConvNeXtCfg):
     return model
 
 
-def convnextmerg(cfg:ConvNeXtCfg):
-    arch_settings = {
-        'atto': {
-            'depths': [2, 2, 6, 2],
-            'channels': [40, 80, 160, 320]
-        },
-        'femto': {
-            'depths': [2, 2, 6, 2],
-            'channels': [48, 96, 192, 384]
-        },
-        'pico': {
-            'depths': [2, 2, 6, 2],
-            'channels': [64, 128, 256, 512]
-        },
-        'nano': {
-            'depths': [2, 2, 8, 2],
-            'channels': [80, 160, 320, 640]
-        },
-        'tiny': {
-            'depths': [3, 3, 9, 3],
-            'channels': [96, 192, 384, 768]
-        },
-        'small': {
-            'depths': [3, 3, 27, 3],
-            'channels': [96, 192, 384, 768]
-        },
-        'base': {
-            'depths': [3, 3, 27, 3],
-            'channels': [128, 256, 512, 1024]
-        },
-        'large': {
-            'depths': [3, 3, 27, 3],
-            'channels': [192, 384, 768, 1536]
-        },
-        'xlarge': {
-            'depths': [3, 3, 27, 3],
-            'channels': [256, 512, 1024, 2048]
-        },
-        'huge': {
-            'depths': [3, 3, 27, 3],
-            'channels': [352, 704, 1408, 2816]
-        }
-    }
-
-    depths = arch_settings[cfg.arch_type]['depths']
-    dims = arch_settings[cfg.arch_type]['channels']
-    model = ConvNeXtMerg(num_classes=cfg.num_classes, depths=depths, dims=dims,
-                     drop_path_rate=cfg.drop_path_rate, 
-                     layer_scale_init_value=cfg.layer_scale_init_value,
-                     head_init_scale=cfg.head_init_scale,
-                     )
-    model.depths = depths
-    model.dims = dims
-    return model
-
 class IterAttnConvNeXt(nn.Module):
     def __init__(self, cfg:ConvNeXtCfg):
         super().__init__()
@@ -396,53 +265,6 @@ class IterAttnConvNeXt(nn.Module):
         return logits
 
 
-##########
-class IterAttnConvNeXtMerg(nn.Module):
-    def __init__(self, cfg:ConvNeXtCfg):
-        super().__init__()
-        self.convnext = convnextmerg(cfg)
-        self.dims = self.convnext.dims
-        del self.convnext.norm
-
-        self.digups = nn.ModuleList()
-        for dim in self.dims:
-            multiple = dim // self.dims[0]
-            scale = dim ** -0.5 / (8 * multiple)
-            digup = Attention(
-                query_dim=self.dims[-1],
-                context_dim=dim,
-                heads=1,
-                dim_head=self.dims[-1],
-                scale= scale,
-            )
-            self.digups.append(digup)
-
-        self.features = nn.Parameter(torch.zeros(1, self.dims[-1]))
-        self.iter_layer_norm = nn.LayerNorm(self.dims[-1])
-
-
-    def forward(self, x):
-        batch_size, _, _, _ = x.shape
-        features = repeat(self.features, 'n d -> b n d', b = batch_size)
-
-        for i, stage in enumerate(self.convnext.stages):
-            x = self.convnext.downsample_layers[i](x)
-            input = x.permute(0, 2, 3, 1)
-            input = rearrange(input, 'b ... d -> b (...) d')
-            features = features + self.digups[i](features, input)
-            features = self.iter_layer_norm(features)
-
-            for layer in stage:
-                x = layer(x)
-                input = x.permute(0, 2, 3, 1)
-                input = rearrange(input, 'b ... d -> b (...) d')
-                features = features + self.digups[i](features, input)
-                features = self.iter_layer_norm(features)
-
-        features = nn.Flatten()(features)
-        logits = self.convnext.head(features)
-        return logits
-
 class PlConvNeXt(ClassifierModule):
     def __init__(self, cfg:ConvNeXtCfg):
         super(PlConvNeXt, self).__init__(cfg)
@@ -456,25 +278,6 @@ class PlIterAttnConvNeXt(ClassifierModule):
     def __init__(self, cfg:ConvNeXtCfg):
         super(PlIterAttnConvNeXt, self).__init__(cfg)
         self.convnext = IterAttnConvNeXt(cfg)
-    
-    def forward(self, x):
-        return self.convnext(x)
-    
-
-######
-class PlConvNeXtMerg(ClassifierModule):
-    def __init__(self, cfg:ConvNeXtCfg):
-        super(PlConvNeXtMerg, self).__init__(cfg)
-        self.convnext = convnextmerg(cfg)
-    
-    def forward(self, x):
-        return self.convnext(x)
-
-
-class PlIterAttnConvNeXtMerg(ClassifierModule):
-    def __init__(self, cfg:ConvNeXtCfg):
-        super(PlIterAttnConvNeXtMerg, self).__init__(cfg)
-        self.convnext = IterAttnConvNeXtMerg(cfg)
     
     def forward(self, x):
         return self.convnext(x)

@@ -172,12 +172,12 @@ class ConvVit(ClassifierModule):
         num_patches = (image_height // patch_height) * (image_width // patch_width)
         patch_dim = 3 * patch_height * patch_width
 
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_height, p2 = patch_width),
-            nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, cfg.hidden_dim),
-            nn.LayerNorm(cfg.hidden_dim),
-        )
+        # self.to_patch_embedding = nn.Sequential(
+        #     Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_height, p2 = patch_width),
+        #     nn.LayerNorm(patch_dim),
+        #     nn.Linear(patch_dim, cfg.hidden_dim),
+        #     nn.LayerNorm(cfg.hidden_dim),
+        # )
 
         # pool and posemb
         assert cfg.pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
@@ -217,16 +217,16 @@ class ConvVit(ClassifierModule):
 
         self.cfg = cfg
         
-        # self.latent = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
+        self.latent = nn.Parameter(torch.zeros(1, 1, cfg.hidden_dim))
 
     def forward(self, x):
         B, _, _, _ = x.shape
         x_trans = x.clone()
-        # latent = repeat(self.latent, '1 1 d -> b 1 d', b = B)
+        latent = repeat(self.latent, '1 1 d -> b 1 d', b = B)
 
         x = self.conv_patch(x)
-        latent = self.to_patch_embedding(x_trans)
-        latent += self.pos_embedding
+        # latent = self.to_patch_embedding(x_trans)
+        # latent += self.pos_embedding
 
         if self.pool == 'cls':
             cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b = B)

@@ -233,34 +233,6 @@ class ViT(ClassifierModule):
         logits = self.mlp_head(x_chosen)
 
         return logits
-    
-
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.fn = fn
-        self.norm = nn.LayerNorm(dim)
-
-    def forward(self, x, **kwargs):
-        x = self.norm(x)
-
-        return self.fn(x, **kwargs)
-
-
-from functools import wraps
-def cache_fn(f):
-    cache = dict()
-    @wraps(f)
-    def cached_fn(*args, _cache = True, key = None, **kwargs):
-        if not _cache:
-            return f(*args, **kwargs)
-        nonlocal cache
-        if key in cache:
-            return cache[key]
-        result = f(*args, **kwargs)
-        cache[key] = result
-        return result
-    return cached_fn
 
 
 class ConVit(ClassifierModule):
@@ -328,8 +300,6 @@ class ConVit(ClassifierModule):
                             dropout=cfg.ff_dropout),
                 nn.LayerNorm(cfg.hidden_dim),
 
-                # ConvMixerLayer(hidden_dim=cfg.hidden_dim,
-                #                kernel_size=cfg.kernel_size)
             ]))
 
         self.attn = Attention(query_dim=cfg.hidden_dim,

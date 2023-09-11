@@ -116,3 +116,8 @@ class BYOL_EMA(pl.Callback):
     def update_weights(self, student: nn.Module, teacher: nn.Module):
         for student_params, teacher_params in zip(student.parameters(), teacher.parameters()):
             teacher_params.data = self.current_tau * teacher_params.data + (1 - self.current_tau) * student_params.data
+
+
+
+
+

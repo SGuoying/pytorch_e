@@ -10,8 +10,6 @@ from sunyata.pytorch.layer.drop import DropPath
 from sunyata.pytorch.layer.attention import Attention
 from sunyata.pytorch_lightning.base import BaseModule, ClassifierModule
 
-from mup import MuReadout
-
 # copy from https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py
 
 class LayerNorm(nn.Module):

@@ -214,4 +214,54 @@ class IterAttnConvMixer2(ConvMixer2):
         latent = nn.Flatten()(latent)
         logits = self.fc(latent)
         return logits
+    
+
+# %%
+class IterECAConvMixer(ConvMixer):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+        
+        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
+
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+
+    def forward(self, x):
+        x = self.embed(x)
+        logits = self.logits_layer_norm(self.digup(x))
+        for layer in self.layers:
+            
+            x = x + layer(x)
+
+            logits = logits + self.logits_layer_norm(self.digup(x))
+#             logits = self.logits_layer_norm(logits)
+        logits = self.fc(self.logits_layer_norm(logits))
+        return logits
+    
+class IterECAConvMixer2(ConvMixer2):
+    def __init__(self, cfg: ConvMixerCfg):
+        super().__init__(cfg)
+
+        self.logits_layer_norm = nn.LayerNorm(cfg.hidden_dim)
+        if cfg.layer_norm_zero_init:
+            self.logits_layer_norm.weight.data = torch.zeros(self.logits_layer_norm.weight.data.shape)
+        
+        self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
+
+        self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
+
+    def forward(self, x):
+        x = self.embed(x)
+        logits = self.logits_layer_norm(self.digup(x))
+        for layer in self.layers:
+            
+            x =layer(x)
+
+            logits = logits + self.logits_layer_norm(self.digup(x))
+#             logits = self.logits_layer_norm(logits)
+        logits = self.fc(self.logits_layer_norm(logits))
+        return logits
 

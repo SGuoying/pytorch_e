@@ -140,30 +140,6 @@ class PlConvMixerOld(BaseModule):
         return loss
 
 
-class SumConvMixer(PlConvMixerOld):
-    def __init__(self, cfg:ConvMixerCfg):
-        super().__init__(cfg)
-        self.layers = nn.Sequential(*[
-            nn.Sequential(
-                nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, cfg.kernel_size, groups=cfg.hidden_dim, padding="same"),
-                nn.GELU(),
-                nn.BatchNorm2d(cfg.hidden_dim),
-                nn.Conv2d(cfg.hidden_dim, cfg.hidden_dim, kernel_size=1),
-                nn.GELU(),
-                nn.BatchNorm2d(cfg.hidden_dim)
-            ) for _ in range(cfg.num_layers)
-        ])
-
-    def forward(self, x):
-        x = self.embed(x)
-        x1 = x
-        for layer in self.layers:
-            x1 = layer(x1)
-            x = x + x1
-        x = self.digup(x)
-        return x
-
-
 class BayesConvMixer(PlConvMixerOld):
     def __init__(self, cfg:ConvMixerCfg):
         super().__init__(cfg)
@@ -224,3 +200,4 @@ class BayesConvMixer2(PlConvMixerOld):
         accuracy = (log_posterior.argmax(dim=-1) == target).float().mean()
         self.log(mode + "_accuracy", accuracy, prog_bar=True)
         return loss
+

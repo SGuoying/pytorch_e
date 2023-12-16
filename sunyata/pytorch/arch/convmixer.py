@@ -91,7 +91,6 @@ class IterConvMixer(ConvMixer):
             nn.AdaptiveAvgPool2d((1,1)),
             nn.Flatten(),
         )
-#         self.digup = EfficientChannelAttention(kernel_size=cfg.eca_kernel_size)
         self.fc = nn.Linear(cfg.hidden_dim, cfg.num_classes)
         self.skip_connection = cfg.skip_connection
 
@@ -264,4 +263,5 @@ class IterECAConvMixer2(ConvMixer2):
 #             logits = self.logits_layer_norm(logits)
         logits = self.fc(self.logits_layer_norm(logits))
         return logits
+
 

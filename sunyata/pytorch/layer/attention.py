@@ -2,6 +2,7 @@
 from typing import Optional
 import torch
 import torch.nn as nn
+import math
 import torch.nn.functional as F
 from einops import rearrange
 
@@ -28,6 +29,21 @@ class EfficientChannelAttention(nn.Module):
         y = self.conv(y.squeeze(-1).transpose(-1,-2))
         y = y.transpose(-1,-2).squeeze(-1)
         return y
+
+class ECABlock(nn.Module):
+    def __init__(self, channels, gamma = 2, b = 1):
+        super(ECABlock, self).__init__()
+        kernel_size = int(abs((math.log(channels, 2) + b) / gamma))
+        kernel_size = kernel_size if kernel_size % 2 else kernel_size + 1
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size = kernel_size, padding = (kernel_size - 1) // 2, bias = False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        v = self.avg_pool(x)
+        v = self.conv(v.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+        v = self.sigmoid(v)
+        return x * v
 
 
 # %%
@@ -89,28 +105,6 @@ class SelfAttention(nn.Module):
 
 # %%
 class Attention(nn.Module):
-    """
-    Cross Attention modified from Perceiver.
-
-    Three dimensions:
-    - query_dim (or latent_dim): dim of the latent space
-    - context_dim: dim of the input space
-    - inner_dim: dim of the inner space of attention, equal to dim_head * heads
-
-    Two inputs:
-    - x: input from the latent space, with shape (latent, query_dim)
-    - context: input from the input space, with shape (input, context_dim)
-
-    Data flow:
-    x(latent, query_dim) -- Linear(query_dim, inner_dim) --> q(latent, inner_dim)
-    context(input, context_dim) -- nn.Linear(context_dim, inner_dim * 2) --> k,v(input, inner_dim)
-    q(latent, inner_dim) * k(input, inner_dim) --> sim(latent, input) -- softmax(dim=-1) -->
-    attn(latent, input) * v(input, inner_dim) --> 
-    out(latent, inner_dim) -- Linear(inner_dim, query_dim) --> out(latent, query_dim)
-
-    Refs:
-    https://github.com/lucidrains/perceiver-pytorch/
-    """
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, scale=None, dropout=0.):
 
         super().__init__()
@@ -201,3 +195,5 @@ class AttentionWithoutParams(nn.Module):
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
         out = self.to_out(out)
         return out
+
+

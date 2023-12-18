@@ -8,7 +8,7 @@ import pytorch_lightning as pl
 from sunyata.pytorch.arch.base import BaseCfg, Residual, ConvMixerLayer
 from sunyata.pytorch_lightning.base import BaseModule
 
-from sunyata.pytorch.arch.convnext import BottleNeckBlock
+# from sunyata.pytorch.arch.convnext import BottleNeckBlock
 from sunyata.pytorch.arch.patchconvnet import PatchConvBlock
 
 
